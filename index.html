@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Card Arena - Main Menu</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .btn {
+            @apply w-full font-bold py-3 px-4 rounded-lg text-lg shadow-md transition-transform transform hover:scale-105;
+        }
+        .btn-primary {
+            @apply bg-indigo-600 hover:bg-indigo-700 text-white;
+        }
+        .btn-secondary {
+            @apply bg-green-600 hover:bg-green-700 text-white;
+        }
+        .input-field {
+            @apply block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500;
+        }
+    </style>
+</head>
+<body class="bg-gray-800 text-white flex items-center justify-center h-screen">
+
+    <div class="w-full max-w-md mx-auto bg-gray-900 p-8 rounded-2xl shadow-2xl border border-gray-700">
+        <h1 class="text-4xl font-bold text-center mb-2 text-indigo-400">Project Card Arena</h1>
+        <p class="text-center text-gray-400 mb-8">Your Digital Tabletop Sandbox</p>
+
+        <!-- Create Game Section -->
+        <div class="mb-8">
+            <a href="deckbuilder.html" class="btn btn-primary block text-center">
+                Create New Game & Build Deck
+            </a>
+        </div>
+
+        <div class="relative my-6">
+            <div class="absolute inset-0 flex items-center" aria-hidden="true">
+                <div class="w-full border-t border-gray-700"></div>
+            </div>
+            <div class="relative flex justify-center">
+                <span class="bg-gray-900 px-2 text-sm text-gray-500">OR</span>
+            </div>
+        </div>
+
+        <!-- Join Game Section -->
+        <div>
+            <h2 class="text-xl font-semibold text-center mb-4">Join an Existing Game</h2>
+            <div class="space-y-4">
+                <div>
+                    <label for="gameIdInput" class="sr-only">Game ID</label>
+                    <input type="text" id="gameIdInput" placeholder="Enter Game ID..." class="input-field text-center">
+                </div>
+                <button id="joinGameBtn" class="btn btn-secondary">Join Game</button>
+            </div>
+            <p id="error-message" class="text-red-400 text-sm text-center mt-4 hidden"></p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const joinGameBtn = document.getElementById('joinGameBtn');
+            const gameIdInput = document.getElementById('gameIdInput');
+            const errorMessageEl = document.getElementById('error-message');
+
+            const handleJoinGame = () => {
+                const gameId = gameIdInput.value.trim();
+                
+                if (!gameId) {
+                    errorMessageEl.textContent = 'Please enter a Game ID.';
+                    errorMessageEl.classList.remove('hidden');
+                    return;
+                }
+                
+                // If the user pastes a full URL, extract the ID
+                if (gameId.includes('?gameId=')) {
+                    try {
+                        const url = new URL(gameId);
+                        const extractedId = url.searchParams.get('gameId');
+                        if (extractedId) {
+                             window.location.href = `game.html?gameId=${extractedId}`;
+                        } else {
+                            throw new Error('Invalid URL');
+                        }
+                    } catch (error) {
+                        errorMessageEl.textContent = 'Invalid URL or Game ID format.';
+                        errorMessageEl.classList.remove('hidden');
+                    }
+                } else {
+                    // Assume it's just the ID
+                    window.location.href = `game.html?gameId=${gameId}`;
+                }
+            };
+
+            joinGameBtn.addEventListener('click', handleJoinGame);
+
+            // Allow pressing Enter to join
+            gameIdInput.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    handleJoinGame();
+                }
+            });
+        });
+    </script>
+
+</body>
+</html>
