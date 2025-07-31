@@ -209,12 +209,11 @@
             padding: 2px 6px;
             border-radius: 4px;
         }
-        /* UPDATED: Styles for the card pop-out viewer */
         #card-popout {
             width: 280px;
             background-color: #1f2937;
             border: 1px solid #4f46e5;
-            z-index: 9000; /* Lower than context menu */
+            z-index: 9000;
         }
         #popout-img {
             width: 100%;
@@ -230,6 +229,19 @@
         #popout-cost img {
             width: 16px;
             height: 16px;
+        }
+        /* NEW: Styles for interactive card actions */
+        .interactive-card-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .action-button {
+            padding: 4px 8px;
+            font-size: 12px;
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
         }
     </style>
 </head>
@@ -249,13 +261,27 @@
     
     <div id="zone-viewer-modal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
         <div class="bg-gray-800 rounded-lg max-w-6xl w-full max-h-full overflow-y-auto p-6 relative shadow-2xl border border-indigo-500">
-            <h2 id="zone-viewer-title" class="text-2xl font-bold mb-4 text-indigo-300">Zone</h2>
+            <div class="flex justify-between items-center mb-4">
+                 <h2 id="zone-viewer-title" class="text-2xl font-bold text-indigo-300">Zone</h2>
+                 <button id="finish-interactive-btn" class="hidden bg-green-600 text-white font-bold py-2 px-4 rounded-lg">Finish</button>
+            </div>
             <button id="zone-viewer-close" class="absolute top-4 right-4 text-3xl font-light text-gray-400 hover:text-white leading-none">&times;</button>
             <div id="zone-viewer-content" data-zone-name="" class="card-container min-h-[150px] justify-center">
             </div>
         </div>
     </div>
     
+    <div id="library-search-modal" class="hidden fixed inset-0 bg-black/80 z-50 flex flex-col p-4">
+        <div class="bg-gray-800 rounded-lg max-w-7xl w-full max-h-full mx-auto flex flex-col p-6 shadow-2xl border border-indigo-500">
+            <div class="flex justify-between items-center mb-4 flex-shrink-0">
+                <h2 class="text-2xl font-bold text-indigo-300">Search Library</h2>
+                <button id="library-search-close" class="text-3xl font-light text-gray-400 hover:text-white leading-none">&times;</button>
+            </div>
+            <input type="text" id="library-search-input" placeholder="Search by card name..." class="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white mb-4 flex-shrink-0">
+            <div id="library-search-content" class="card-container flex-grow overflow-y-auto justify-center"></div>
+        </div>
+    </div>
+
     <div id="context-menu" class="context-menu hidden"></div>
     
     <div id="deck-selection-modal" class="hidden fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
@@ -307,7 +333,6 @@
         </div>
     </div>
 
-    <!-- UPDATED: HTML structure for the detailed card pop-out -->
     <div id="card-popout" class="hidden fixed rounded-lg shadow-2xl pointer-events-none p-2 space-y-2">
         <div class="flex justify-between items-start">
             <span id="popout-name" class="font-bold"></span>
@@ -335,6 +360,16 @@
             let longPressTimer;
             let allCardsFromDb = [];
             let cardDataMap = new Map();
+            // NEW: State for interactive library actions
+            let interactiveActionState = {
+                active: false,
+                mode: null, // 'scry' or 'surveil'
+                count: 0,
+                cards: [],
+                toTop: [],
+                toBottom: [],
+                toGraveyard: []
+            };
 
             const mainGridEl = document.querySelector('.main-grid');
             const handAreaEl = document.getElementById('main-player-hand-area');
@@ -348,7 +383,6 @@
             const deckSelectionModal = document.getElementById('deck-selection-modal');
             const deckSelectionList = document.getElementById('deck-selection-list');
             const tokenCreatorModal = document.getElementById('token-creator-modal');
-            
             const cardPopoutEl = document.getElementById('card-popout');
             const popoutNameEl = document.getElementById('popout-name');
             const popoutCostEl = document.getElementById('popout-cost');
@@ -356,6 +390,11 @@
             const popoutTypeEl = document.getElementById('popout-type');
             const popoutPtEl = document.getElementById('popout-pt');
             const popoutTextEl = document.getElementById('popout-text');
+            const librarySearchModal = document.getElementById('library-search-modal');
+            const librarySearchClose = document.getElementById('library-search-close');
+            const librarySearchInput = document.getElementById('library-search-input');
+            const librarySearchContent = document.getElementById('library-search-content');
+            const finishInteractiveBtn = document.getElementById('finish-interactive-btn');
 
             const encodeFirebaseKey = (str) => str.replace(/\//g, '__slash__');
             const decodeFirebaseKey = (str) => str.replace(/__slash__/g, '/');
@@ -574,7 +613,7 @@
                         el.addEventListener('click', drawCard);
                         el.addEventListener('contextmenu', (e) => {
                             e.preventDefault();
-                            promptViewTopCards();
+                            showLibraryContextMenu(e);
                         });
                     } else { 
                         el.addEventListener('click', () => openZoneViewer(playerId, zoneName));
@@ -597,19 +636,6 @@
                     }
                     return playerState;
                 });
-            }
-
-            function promptViewTopCards() {
-                const countStr = prompt("How many cards from the top of your library would you like to view?");
-                if (countStr) {
-                    const count = parseInt(countStr, 10);
-                    if (!isNaN(count) && count > 0) {
-                        const playerState = gameState.players[myPlayerId];
-                        const deck = playerState.deck || [];
-                        const topCards = deck.slice(-count);
-                        openZoneViewer(myPlayerId, 'library', topCards);
-                    }
-                }
             }
 
             function initializeDragAndDrop() {
@@ -710,6 +736,23 @@
                 contextMenu.classList.remove('hidden');
             }
 
+            function showLibraryContextMenu(event) {
+                hideContextMenu();
+                let menuHTML = `
+                    <div>
+                        <button class="context-menu-button" data-action="search-library">Search</button>
+                        <button class="context-menu-button" data-action="shuffle-library">Shuffle</button>
+                        <div class="context-menu-divider"></div>
+                        <button class="context-menu-button" data-action="scry">Scry</button>
+                        <button class="context-menu-button" data-action="surveil">Surveil</button>
+                    </div>
+                `;
+                contextMenu.innerHTML = menuHTML;
+                contextMenu.style.left = `${event.clientX}px`;
+                contextMenu.style.top = `${event.clientY}px`;
+                contextMenu.classList.remove('hidden');
+            }
+
             function hideContextMenu() {
                 contextMenu.classList.add('hidden');
                 contextMenuCard = null;
@@ -735,7 +778,16 @@
                     moveCardToZone(toZone);
                 } else if (action === 'delete-token') {
                     deleteToken();
+                } else if (action === 'search-library') {
+                    openLibrarySearch();
+                } else if (action === 'shuffle-library') {
+                    handleShuffleLibrary();
+                } else if (action === 'scry') {
+                    handleScry();
+                } else if (action === 'surveil') {
+                    handleSurveil();
                 }
+                hideContextMenu();
             }
 
             function changeCounter(encodedCounterName, amount) {
@@ -812,6 +864,7 @@
 
                 hideContextMenu();
                 closeZoneViewer();
+                closeLibrarySearch();
             }
 
             function addCardEventListeners() {
@@ -825,7 +878,7 @@
                     cardEl.removeEventListener('mouseleave', handleCardMouseOut);
                     cardEl.removeEventListener('mousemove', handleCardMouseMove);
 
-                    if (cardEl.closest(`#player-area-${myPlayerId}, #main-player-hand-area, #zone-viewer-modal`)) {
+                    if (cardEl.closest(`#player-area-${myPlayerId}, #main-player-hand-area, #zone-viewer-modal, #library-search-modal`)) {
                         cardEl.addEventListener('click', handleCardClick);
                         cardEl.addEventListener('contextmenu', showContextMenu);
                         cardEl.addEventListener('touchstart', handleTouchStart);
@@ -848,13 +901,11 @@
             function handleTouchEnd() { clearTimeout(longPressTimer); }
             function handleTouchMove() { clearTimeout(longPressTimer); }
 
-            // --- Card Pop-out Functions ---
-            // NEW: Helper function to parse mana cost into images
             function parseManaCost(cost) {
                 if (!cost) return '';
                 const symbolRegex = /\{([^}]+)\}/g;
                 return cost.replace(symbolRegex, (match, symbol) => {
-                    const sanitizedSymbol = symbol.replace('/', ''); // For symbols like {W/P}
+                    const sanitizedSymbol = symbol.replace('/', '');
                     return `<img src="https://svgs.scryfall.io/card-symbols/${sanitizedSymbol.toUpperCase()}.svg" alt="${symbol}" class="inline-block w-4 h-4">`;
                 });
             }
@@ -864,12 +915,11 @@
                 const cardData = cardDataMap.get(instanceId);
                 if (cardData && !cardData.isToken) {
                     popoutNameEl.textContent = cardData.name;
-                    popoutCostEl.innerHTML = parseManaCost(cardData.cost); // Use the new parser
+                    popoutCostEl.innerHTML = parseManaCost(cardData.cost);
                     popoutImgEl.src = cardData.imageUrl;
                     popoutTypeEl.textContent = cardData.type;
                     popoutTextEl.textContent = cardData.text || '';
                     
-                    // FIX: Check for both power and toughness before displaying
                     if (cardData.power && cardData.toughness) {
                         popoutPtEl.textContent = `${cardData.power}/${cardData.toughness}`;
                     } else if (cardData.loyalty) {
@@ -897,7 +947,6 @@
                 if (top + popoutHeight > window.innerHeight) {
                     top = event.clientY - popoutHeight - buffer;
                 }
-                // FIX: Add check to prevent going off the top of the screen
                 if (top < 0) {
                     top = buffer;
                 }
@@ -1025,6 +1074,9 @@
                 if (modalSortable) modalSortable.destroy();
                 modalSortable = null;
                 zoneViewerModal.classList.add('hidden');
+                // Reset interactive state on close
+                finishInteractiveBtn.classList.add('hidden');
+                interactiveActionState.active = false;
             }
             
             function showDeckSelectionModal() {
@@ -1041,7 +1093,7 @@
                         button.addEventListener('click', () => {
                             const playerName = document.getElementById('joiningPlayerName').value.trim();
                             if (!playerName) {
-                                alert("Please enter your name."); // Replace with a better modal later
+                                alert("Please enter your name.");
                                 return;
                             }
                             const deckData = savedDecks[deckName];
@@ -1106,16 +1158,177 @@
                 hideContextMenu();
             }
 
+            // --- Library Functions ---
+            function openLibrarySearch() {
+                const playerState = gameState.players[myPlayerId];
+                if (!playerState || !playerState.deck) return;
+                
+                librarySearchContent.innerHTML = '';
+                playerState.deck.slice().reverse().forEach(card => {
+                    const cardEl = createCardElement(card);
+                    librarySearchContent.appendChild(cardEl);
+                });
+                
+                addCardEventListeners();
+                librarySearchModal.classList.remove('hidden');
+            }
+
+            function closeLibrarySearch() {
+                librarySearchModal.classList.add('hidden');
+                librarySearchInput.value = '';
+            }
+
+            function filterLibrary() {
+                const searchTerm = librarySearchInput.value.toLowerCase();
+                librarySearchContent.querySelectorAll('.card').forEach(cardEl => {
+                    const cardData = cardDataMap.get(cardEl.dataset.instanceId);
+                    if (cardData) {
+                        const isVisible = cardData.name.toLowerCase().includes(searchTerm);
+                        cardEl.style.display = isVisible ? '' : 'none';
+                    }
+                });
+            }
+
+            function handleShuffleLibrary() {
+                const playerRef = gameRef.child('players').child(myPlayerId);
+                playerRef.transaction(playerState => {
+                    if (playerState && playerState.deck) {
+                        shuffle(playerState.deck);
+                    }
+                    return playerState;
+                });
+            }
+
+            function handleScry() {
+                const countStr = prompt("Scry how many cards?");
+                if (countStr) {
+                    const count = parseInt(countStr, 10);
+                    if (!isNaN(count) && count > 0) {
+                        openInteractiveZoneViewer('scry', count);
+                    }
+                }
+            }
+
+            function handleSurveil() {
+                const countStr = prompt("Surveil how many cards?");
+                if (countStr) {
+                    const count = parseInt(countStr, 10);
+                    if (!isNaN(count) && count > 0) {
+                        openInteractiveZoneViewer('surveil', count);
+                    }
+                }
+            }
+
+            function openInteractiveZoneViewer(mode, count) {
+                const playerState = gameState.players[myPlayerId];
+                const deck = playerState.deck || [];
+                
+                interactiveActionState = {
+                    active: true,
+                    mode: mode,
+                    count: Math.min(count, deck.length),
+                    cards: deck.slice(-count),
+                    toTop: [],
+                    toBottom: [],
+                    toGraveyard: []
+                };
+
+                zoneViewerTitle.textContent = `${mode.charAt(0).toUpperCase() + mode.slice(1)} ${interactiveActionState.count}`;
+                zoneViewerContent.innerHTML = '';
+                
+                interactiveActionState.cards.slice().reverse().forEach(card => {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'interactive-card-wrapper';
+                    wrapper.dataset.instanceId = card.instanceId;
+
+                    const cardEl = createCardElement(card);
+                    wrapper.appendChild(cardEl);
+
+                    const buttonContainer = document.createElement('div');
+                    buttonContainer.className = 'flex justify-around mt-1';
+                    
+                    const topBtn = document.createElement('button');
+                    topBtn.textContent = 'Top';
+                    topBtn.className = 'action-button bg-blue-600';
+                    topBtn.onclick = () => resolveInteractiveCard(card, 'top');
+                    
+                    const bottomBtn = document.createElement('button');
+                    bottomBtn.className = 'action-button';
+                    
+                    if (mode === 'scry') {
+                        bottomBtn.textContent = 'Bottom';
+                        bottomBtn.className += ' bg-gray-600';
+                        bottomBtn.onclick = () => resolveInteractiveCard(card, 'bottom');
+                    } else { // surveil
+                        bottomBtn.textContent = 'Graveyard';
+                        bottomBtn.className += ' bg-red-600';
+                        bottomBtn.onclick = () => resolveInteractiveCard(card, 'graveyard');
+                    }
+                    
+                    buttonContainer.appendChild(topBtn);
+                    buttonContainer.appendChild(bottomBtn);
+                    wrapper.appendChild(buttonContainer);
+                    zoneViewerContent.appendChild(wrapper);
+                });
+
+                zoneViewerModal.classList.remove('hidden');
+            }
+
+            function resolveInteractiveCard(card, destination) {
+                const wrapper = zoneViewerContent.querySelector(`[data-instance-id="${card.instanceId}"]`);
+                if (wrapper) {
+                    wrapper.style.display = 'none';
+                }
+
+                if (destination === 'top') interactiveActionState.toTop.push(card);
+                else if (destination === 'bottom') interactiveActionState.toBottom.push(card);
+                else if (destination === 'graveyard') interactiveActionState.toGraveyard.push(card);
+                
+                const remainingCards = interactiveActionState.cards.length - (interactiveActionState.toTop.length + interactiveActionState.toBottom.length + interactiveActionState.toGraveyard.length);
+                if (remainingCards === 0) {
+                    finishInteractiveBtn.classList.remove('hidden');
+                }
+            }
+
+            function finishInteractiveAction() {
+                const playerRef = gameRef.child('players').child(myPlayerId);
+                playerRef.transaction(playerState => {
+                    if (playerState && playerState.deck) {
+                        const originalDeckSize = playerState.deck.length;
+                        const restOfDeck = playerState.deck.slice(0, originalDeckSize - interactiveActionState.count);
+                        
+                        // Cards are put back in the order they were chosen
+                        const newDeck = [
+                            ...restOfDeck, 
+                            ...interactiveActionState.toBottom, 
+                            ...interactiveActionState.toTop.reverse()
+                        ];
+                        playerState.deck = newDeck;
+
+                        if (interactiveActionState.toGraveyard.length > 0) {
+                            if (!playerState.graveyard) playerState.graveyard = [];
+                            playerState.graveyard.push(...interactiveActionState.toGraveyard);
+                        }
+                    }
+                    return playerState;
+                });
+                closeZoneViewer();
+            }
+
+
             async function initializeGame() {
                 contextMenu.addEventListener('click', handleContextMenuClick);
                 
                 window.addEventListener('click', (e) => {
-                    if (!contextMenu.contains(e.target) && !e.target.closest('.card')) {
+                    if (!contextMenu.contains(e.target) && !e.target.closest('.card') && !e.target.closest('.clickable-zone')) {
                          hideContextMenu();
                     }
                 });
                 window.addEventListener('contextmenu', (e) => {
-                     if (!e.target.closest('.card')) hideContextMenu();
+                     const target = e.target;
+                     if (!target.closest('.card') && !target.closest(`#${myPlayerId}-library`)) {
+                        hideContextMenu();
+                     }
                 });
 
                 mainGridEl.addEventListener('click', (event) => {
@@ -1135,6 +1348,10 @@
                     if (e.target === zoneViewerModal) closeZoneViewer();
                 });
 
+                librarySearchClose.addEventListener('click', closeLibrarySearch);
+                librarySearchInput.addEventListener('input', filterLibrary);
+                finishInteractiveBtn.addEventListener('click', finishInteractiveAction);
+
                 const tokenCreateBtn = document.getElementById('token-creator-create');
                 const tokenCancelBtn = document.getElementById('token-creator-cancel');
                 const commonTokenSelect = document.getElementById('common-token-select');
@@ -1145,7 +1362,7 @@
                     const name = document.getElementById('token-name').value;
                     const pt = document.getElementById('token-pt').value;
                     const text = document.getElementById('token-text').value;
-                    if(name) { // Only create if a name is provided
+                    if(name) {
                         createToken({ name, pt, text });
                         document.getElementById('token-name').value = '';
                         document.getElementById('token-pt').value = '';
@@ -1183,7 +1400,7 @@
                     if (Object.keys(tokenData).length > 0) {
                         createToken(tokenData);
                     }
-                    e.target.value = ""; // Reset dropdown
+                    e.target.value = "";
                 });
 
 
