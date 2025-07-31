@@ -246,8 +246,9 @@
 </head>
 <body class="bg-gray-800 text-white h-screen flex flex-col">
 
-    <div class="absolute top-2 left-2 bg-black/50 p-2 rounded-lg text-xs z-20">
-        Game ID: <span id="gameIdDisplay"></span>
+    <div class="absolute top-2 left-2 bg-black/50 p-2 rounded-lg text-xs z-20 flex items-center gap-4">
+        <div>Game ID: <span id="gameIdDisplay"></span></div>
+        <button id="leaveGameBtn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded-lg">Leave Game</button>
     </div>
 
     <main class="main-grid flex-grow p-2">
@@ -393,6 +394,7 @@
             const librarySearchInput = document.getElementById('library-search-input');
             const librarySearchContent = document.getElementById('library-search-content');
             const finishInteractiveBtn = document.getElementById('finish-interactive-btn');
+            const leaveGameBtn = document.getElementById('leaveGameBtn');
 
             const encodeFirebaseKey = (str) => str.replace(/\//g, '__slash__');
             const decodeFirebaseKey = (str) => str.replace(/__slash__/g, '/');
@@ -688,7 +690,6 @@
                 const parentZoneEl = cardEl.closest('[data-zone-name]');
                 let parentZoneName = parentZoneEl ? parentZoneEl.dataset.zoneName : null;
                 
-                // FIX: Correctly identify when a card is in the library search modal
                 if (cardEl.closest('#library-search-modal')) {
                     parentZoneName = 'deck';
                 }
@@ -1329,6 +1330,21 @@
                 closeZoneViewer();
             }
 
+            function leaveGame() {
+                if (myPlayerId && gameRef) {
+                    gameRef.child('players').child(myPlayerId).remove()
+                        .then(() => {
+                            window.location.href = 'index.html';
+                        })
+                        .catch(error => {
+                            console.error("Error leaving game:", error);
+                            window.location.href = 'index.html';
+                        });
+                } else {
+                    window.location.href = 'index.html';
+                }
+            }
+
 
             async function initializeGame() {
                 contextMenu.addEventListener('click', handleContextMenuClick);
@@ -1365,6 +1381,7 @@
                 librarySearchClose.addEventListener('click', closeLibrarySearch);
                 librarySearchInput.addEventListener('input', filterLibrary);
                 finishInteractiveBtn.addEventListener('click', finishInteractiveAction);
+                leaveGameBtn.addEventListener('click', leaveGame);
 
                 const tokenCreateBtn = document.getElementById('token-creator-create');
                 const tokenCancelBtn = document.getElementById('token-creator-cancel');
