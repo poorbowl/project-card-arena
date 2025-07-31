@@ -209,6 +209,13 @@
             padding: 2px 6px;
             border-radius: 4px;
         }
+        /* NEW: Styles for the card pop-out viewer */
+        #card-popout {
+            width: 250px;
+            height: 350px;
+            border: 2px solid white;
+            z-index: 10000;
+        }
     </style>
 </head>
 <body class="bg-gray-800 text-white h-screen flex flex-col">
@@ -285,6 +292,9 @@
         </div>
     </div>
 
+    <!-- NEW: HTML for the card pop-out viewer -->
+    <div id="card-popout" class="hidden fixed bg-cover bg-center rounded-lg shadow-2xl pointer-events-none"></div>
+
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -298,6 +308,7 @@
             let contextMenuCard = null;
             let longPressTimer;
             let allCardsFromDb = [];
+            let cardDataMap = new Map(); // For quick card data lookups
 
             const mainGridEl = document.querySelector('.main-grid');
             const handAreaEl = document.getElementById('main-player-hand-area');
@@ -311,6 +322,7 @@
             const deckSelectionModal = document.getElementById('deck-selection-modal');
             const deckSelectionList = document.getElementById('deck-selection-list');
             const tokenCreatorModal = document.getElementById('token-creator-modal');
+            const cardPopoutEl = document.getElementById('card-popout'); // NEW: Get pop-out element
 
             const encodeFirebaseKey = (str) => str.replace(/\//g, '__slash__');
             const decodeFirebaseKey = (str) => str.replace(/__slash__/g, '/');
@@ -425,6 +437,21 @@
                     setupBoardHTML(orderedPlayerIds);
                 }
 
+                // NEW: Build a map of all cards for quick lookups (for pop-out)
+                cardDataMap.clear();
+                Object.values(gameState.players).forEach(player => {
+                    const zones = ['hand', 'battlefield', 'graveyard', 'exile', 'commander', 'deck'];
+                    zones.forEach(zone => {
+                        if (player[zone]) {
+                            player[zone].forEach(card => {
+                                if (card && card.instanceId) {
+                                    cardDataMap.set(card.instanceId, card);
+                                }
+                            });
+                        }
+                    });
+                });
+
                 orderedPlayerIds.forEach(playerId => {
                     const playerState = gameState.players[playerId];
                     if (!playerState) return;
@@ -448,7 +475,6 @@
                     document.getElementById(`${playerId}-library`).querySelector('.zone-title').textContent = `LIBRARY (${(playerState.deck || []).length})`;
                     document.getElementById(`${playerId}-life-total`).value = playerState.life ?? 40;
 
-                    // FIX: Clean up ALL non-battlefield zones to prevent visual artifacts
                     document.querySelectorAll(`#${playerId}-graveyard .card, #${playerId}-exile .card, #${playerId}-library .card, #${playerId}-commander .card`).forEach(c => c.remove());
                 });
 
@@ -459,7 +485,7 @@
                 }
                 
                 initializeDragAndDrop();
-                addClickListenersToMyCards();
+                addCardEventListeners();
             }
 
             function setupBoardHTML(orderedPlayerIds) {
@@ -756,19 +782,32 @@
                 closeZoneViewer();
             }
 
-            function addClickListenersToMyCards() {
-                 document.querySelectorAll(`#player-area-${myPlayerId} .card, #zone-viewer-modal .card`).forEach(cardEl => {
+            // NEW: Renamed function to be more descriptive
+            function addCardEventListeners() {
+                 document.querySelectorAll('.card').forEach(cardEl => {
+                    // Remove old listeners to prevent duplicates
                     cardEl.removeEventListener('click', handleCardClick);
                     cardEl.removeEventListener('contextmenu', showContextMenu);
                     cardEl.removeEventListener('touchstart', handleTouchStart);
                     cardEl.removeEventListener('touchend', handleTouchEnd);
                     cardEl.removeEventListener('touchmove', handleTouchMove);
+                    cardEl.removeEventListener('mouseenter', handleCardMouseOver);
+                    cardEl.removeEventListener('mouseleave', handleCardMouseOut);
+                    cardEl.removeEventListener('mousemove', handleCardMouseMove);
 
-                    cardEl.addEventListener('click', handleCardClick);
-                    cardEl.addEventListener('contextmenu', showContextMenu);
-                    cardEl.addEventListener('touchstart', handleTouchStart);
-                    cardEl.addEventListener('touchend', handleTouchEnd);
-                    cardEl.addEventListener('touchmove', handleTouchMove);
+                    // Add listeners for game actions (only for my cards)
+                    if (cardEl.closest(`#player-area-${myPlayerId}, #main-player-hand-area, #zone-viewer-modal`)) {
+                        cardEl.addEventListener('click', handleCardClick);
+                        cardEl.addEventListener('contextmenu', showContextMenu);
+                        cardEl.addEventListener('touchstart', handleTouchStart);
+                        cardEl.addEventListener('touchend', handleTouchEnd);
+                        cardEl.addEventListener('touchmove', handleTouchMove);
+                    }
+
+                    // Add listeners for pop-out on ALL cards
+                    cardEl.addEventListener('mouseenter', handleCardMouseOver);
+                    cardEl.addEventListener('mouseleave', handleCardMouseOut);
+                    cardEl.addEventListener('mousemove', handleCardMouseMove);
                 });
             }
 
@@ -780,6 +819,26 @@
             }
             function handleTouchEnd() { clearTimeout(longPressTimer); }
             function handleTouchMove() { clearTimeout(longPressTimer); }
+
+            // --- NEW: Card Pop-out Functions ---
+            function handleCardMouseOver(event) {
+                const instanceId = event.currentTarget.dataset.instanceId;
+                const cardData = cardDataMap.get(instanceId);
+                if (cardData && !cardData.isToken) {
+                    cardPopoutEl.style.backgroundImage = `url(${cardData.imageUrl})`;
+                    cardPopoutEl.classList.remove('hidden');
+                }
+            }
+
+            function handleCardMouseOut() {
+                cardPopoutEl.classList.add('hidden');
+            }
+
+            function handleCardMouseMove(event) {
+                // Position the pop-out slightly to the right and below the cursor
+                cardPopoutEl.style.left = `${event.clientX + 20}px`;
+                cardPopoutEl.style.top = `${event.clientY + 20}px`;
+            }
             
             function handleCardMove(event) {
                 const cardEl = event.item;
@@ -876,7 +935,7 @@
                 
                 zoneViewerModal.classList.remove('hidden');
                 
-                addClickListenersToMyCards(); 
+                addCardEventListeners(); 
 
                 if (playerId === myPlayerId && cardsToShow === null) {
                     modalSortable = new Sortable(zoneViewerContent, {
