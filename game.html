@@ -230,7 +230,6 @@
             width: 16px;
             height: 16px;
         }
-        /* NEW: Styles for interactive card actions */
         .interactive-card-wrapper {
             display: flex;
             flex-direction: column;
@@ -360,10 +359,9 @@
             let longPressTimer;
             let allCardsFromDb = [];
             let cardDataMap = new Map();
-            // NEW: State for interactive library actions
             let interactiveActionState = {
                 active: false,
-                mode: null, // 'scry' or 'surveil'
+                mode: null,
                 count: 0,
                 cards: [],
                 toTop: [],
@@ -1074,7 +1072,6 @@
                 if (modalSortable) modalSortable.destroy();
                 modalSortable = null;
                 zoneViewerModal.classList.add('hidden');
-                // Reset interactive state on close
                 finishInteractiveBtn.classList.add('hidden');
                 interactiveActionState.active = false;
             }
@@ -1297,10 +1294,10 @@
                         const originalDeckSize = playerState.deck.length;
                         const restOfDeck = playerState.deck.slice(0, originalDeckSize - interactiveActionState.count);
                         
-                        // Cards are put back in the order they were chosen
+                        // FIX: Correctly order the deck after scrying
                         const newDeck = [
+                            ...interactiveActionState.toBottom,
                             ...restOfDeck, 
-                            ...interactiveActionState.toBottom, 
                             ...interactiveActionState.toTop.reverse()
                         ];
                         playerState.deck = newDeck;
