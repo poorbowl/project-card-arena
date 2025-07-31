@@ -35,7 +35,7 @@
 
     <div class="mb-4 border-b border-gray-700">
         <nav class="flex space-x-4" aria-label="Tabs">
-            <button id="tab-btn-create" class="tab-button active px-3 py-2 font-medium text-sm rounded-t-lg">Create Card</button>
+            <button id="tab-btn-create" class="tab-button active px-3 py-2 font-medium text-sm rounded-t-lg">Create/Edit Card</button>
             <button id="tab-btn-import" class="tab-button px-3 py-2 font-medium text-sm rounded-t-lg">Bulk Import</button>
         </nav>
     </div>
@@ -43,7 +43,7 @@
     <div>
         <div id="tab-content-create" class="tab-content active">
              <div class="bg-gray-900 p-6 rounded-lg shadow-lg">
-                <h2 class="text-xl font-semibold mb-4">Create New Card</h2>
+                <h2 id="form-title" class="text-xl font-semibold mb-4">Create New Card</h2>
                 <form id="addCardForm">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -67,7 +67,7 @@
                             <input type="text" id="manaCost" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
                         </div>
                         <div>
-                            <label for="cardImage" class="block text-sm font-medium text-gray-400">Card Image (Required)</label>
+                            <label for="cardImage" class="block text-sm font-medium text-gray-400">Card Image (Optional when editing)</label>
                             <input type="file" id="cardImage" accept="image/*" class="mt-1 block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700">
                         </div>
                         <div class="col-span-1 md:col-span-2">
@@ -91,7 +91,10 @@
                     </div>
                 </form>
                 <div id="message-area" class="hidden my-4 p-3 rounded-lg"></div>
-                <button id="addCard" class="mt-4 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105">Add to Collection</button>
+                <div class="mt-4 flex gap-4">
+                    <button id="saveCardBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105">Add to Collection</button>
+                    <button id="cancelEditBtn" class="hidden w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Cancel Edit</button>
+                </div>
             </div>
         </div>
         <div id="tab-content-import" class="tab-content">
@@ -173,7 +176,9 @@
         const deckNameEl = document.getElementById('deckName');
         const saveDeckBtn = document.getElementById('saveDeck');
         const savedDecksEl = document.getElementById('savedDecks');
-        const addCardBtn = document.getElementById('addCard');
+        const saveCardBtn = document.getElementById('saveCardBtn');
+        const cancelEditBtn = document.getElementById('cancelEditBtn');
+        const formTitleEl = document.getElementById('form-title');
         const cardTypeSelect = document.getElementById('cardType');
         const creatureFields = document.getElementById('creatureFields');
         const planeswalkerFields = document.getElementById('planeswalkerFields');
@@ -186,7 +191,8 @@
         let currentDeck = [];
         let commanders = [];
         let uploadedImageMap = new Map();
-        let myUserId = null; // Variable to hold the user's ID
+        let myUserId = null;
+        let editingCardId = null; // To track which card is being edited
 
         // --- TABS & FORM LOGIC ---
         const tabBtns = document.querySelectorAll('.tab-button');
@@ -224,9 +230,12 @@
 
         // --- RENDER FUNCTIONS ---
         const renderCard = (card, container) => {
-            const cardEl = document.createElement('div');
-            cardEl.className = 'p-2 bg-gray-700 rounded-lg flex flex-col items-center cursor-pointer hover:bg-indigo-500 transition-colors';
-            cardEl.dataset.cardId = card.id;
+            const cardWrapper = document.createElement('div');
+            cardWrapper.className = 'p-2 bg-gray-700 rounded-lg flex flex-col items-center';
+            
+            const cardImageEl = document.createElement('div');
+            cardImageEl.className = 'cursor-pointer';
+            cardImageEl.dataset.cardId = card.id;
             
             const img = document.createElement('img');
             img.src = card.imageUrl || 'https://placehold.co/100x140/2d3748/e2e8f0?text=No+Image';
@@ -237,11 +246,30 @@
             name.textContent = card.name;
             name.className = 'text-xs text-center';
 
-            cardEl.appendChild(img);
-            cardEl.appendChild(name);
+            cardImageEl.appendChild(img);
+            cardImageEl.appendChild(name);
+            cardImageEl.addEventListener('click', () => addCardToDeck(card));
+            
+            const buttonBar = document.createElement('div');
+            buttonBar.className = 'flex justify-around w-full mt-2';
+            
+            const editBtn = document.createElement('button');
+            editBtn.textContent = 'Edit';
+            editBtn.className = 'text-xs bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded';
+            editBtn.onclick = () => populateFormForEdit(card.id);
 
-            cardEl.addEventListener('click', () => addCardToDeck(card));
-            container.appendChild(cardEl);
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = 'Delete';
+            deleteBtn.className = 'text-xs bg-red-600 hover:bg-red-700 px-2 py-1 rounded';
+            deleteBtn.onclick = () => deleteCard(card.id);
+
+            buttonBar.appendChild(editBtn);
+            buttonBar.appendChild(deleteBtn);
+
+            cardWrapper.appendChild(cardImageEl);
+            cardWrapper.appendChild(buttonBar);
+
+            container.appendChild(cardWrapper);
         };
 
         const renderCollection = () => {
@@ -339,52 +367,158 @@
             }
         }
 
-        const handleAddCard = async () => {
+        const handleSaveCard = async () => {
             hideMessage();
-            addCardBtn.disabled = true;
-            addCardBtn.textContent = "Saving...";
+            saveCardBtn.disabled = true;
 
             const name = document.getElementById('cardName').value.trim();
             const type = document.getElementById('cardType').value;
-            const cost = document.getElementById('manaCost').value.trim();
-            const text = document.getElementById('cardText').value.trim();
             const imageFile = document.getElementById('cardImage').files[0];
 
-            if (!name || !type || !imageFile) {
-                showMessage('Card Name, Type, and an Image are required.');
-                addCardBtn.disabled = false;
-                addCardBtn.textContent = "Add to Collection";
+            if (!name || !type) {
+                showMessage('Card Name and Type are required.');
+                saveCardBtn.disabled = false;
+                return;
+            }
+            if (!editingCardId && !imageFile) {
+                showMessage('An Image is required when creating a new card.');
+                saveCardBtn.disabled = false;
                 return;
             }
 
+            saveCardBtn.textContent = "Saving...";
+            
             try {
-                const imageRef = storage.ref(`card-images/${Date.now()}-${imageFile.name}`);
-                const uploadTask = await imageRef.put(imageFile);
-                const imageUrl = await uploadTask.ref.getDownloadURL();
-
-                const newCardData = {
-                    name, type, cost, text, imageUrl,
+                let imageUrl;
+                const cardDataToSave = {
+                    name, type,
+                    cost: document.getElementById('manaCost').value.trim(),
+                    text: document.getElementById('cardText').value.trim(),
                     power: type === 'Creature' ? document.getElementById('power').value : null,
                     toughness: type === 'Creature' ? document.getElementById('toughness').value : null,
                     loyalty: type === 'Planeswalker' ? document.getElementById('loyalty').value : null,
                 };
 
-                const docRef = await db.collection('cards').add(newCardData);
+                if (imageFile) {
+                    const imageRef = storage.ref(`card-images/${Date.now()}-${imageFile.name}`);
+                    const uploadTask = await imageRef.put(imageFile);
+                    imageUrl = await uploadTask.ref.getDownloadURL();
+                    cardDataToSave.imageUrl = imageUrl;
+                }
+
+                if (editingCardId) {
+                    const cardRef = db.collection('cards').doc(editingCardId);
+                    await cardRef.update(cardDataToSave);
+                    
+                    const cardIndex = allCards.findIndex(c => c.id === editingCardId);
+                    if(cardIndex > -1) {
+                        allCards[cardIndex] = { ...allCards[cardIndex], ...cardDataToSave };
+                    }
+                    showMessage(`Success: "${name}" was updated.`, false);
+                } else {
+                    const docRef = await db.collection('cards').add(cardDataToSave);
+                    allCards.push({ id: docRef.id, ...cardDataToSave });
+                    showMessage(`Success: "${name}" was added.`, false);
+                }
                 
-                allCards.push({ id: docRef.id, ...newCardData });
                 allCards.sort((a, b) => a.name.localeCompare(b.name));
                 renderCollection();
-
-                document.getElementById('addCardForm').reset();
-                showMessage(`Success: "${name}" was added.`, false);
+                resetForm();
 
             } catch (error) {
-                console.error("Error adding card: ", error);
-                showMessage("Failed to add card. Check console for details.");
+                console.error("Error saving card: ", error);
+                showMessage("Failed to save card. Check console for details.");
             } finally {
-                addCardBtn.disabled = false;
-                addCardBtn.textContent = "Add to Collection";
+                saveCardBtn.disabled = false;
             }
+        };
+
+        const deleteCard = async (cardId) => {
+            const cardToDelete = allCards.find(c => c.id === cardId);
+            if (!cardToDelete) return;
+
+            // NEW: Check if card is in any saved decks
+            const decks = getSavedDecks();
+            const decksContainingCard = Object.entries(decks).filter(([name, deckData]) => {
+                const cardIds = deckData.cardIds || deckData; // For backwards compatibility
+                return cardIds.includes(cardId);
+            }).map(([name]) => name);
+
+            let confirmMessage = `Are you sure you want to permanently delete "${cardToDelete.name}"?`;
+            if (decksContainingCard.length > 0) {
+                confirmMessage += `\n\nWarning: This card is in the following saved decks: ${decksContainingCard.join(', ')}. Deleting it will remove it from these decks.`;
+            }
+
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+
+            try {
+                // Delete from Firestore
+                await db.collection('cards').doc(cardId).delete();
+
+                // Delete image from Storage
+                if (cardToDelete.imageUrl) {
+                    const imageRef = storage.refFromURL(cardToDelete.imageUrl);
+                    await imageRef.delete();
+                }
+
+                // Update local state and re-render
+                allCards = allCards.filter(c => c.id !== cardId);
+                renderCollection();
+                
+                // Also remove from current deck if it exists
+                currentDeck = currentDeck.filter(c => c.id !== cardId);
+                commanders = commanders.filter(c => c.id !== cardId);
+                renderDeckList();
+
+                // Remove from saved decks
+                Object.entries(decks).forEach(([name, deckData]) => {
+                    const cardIds = deckData.cardIds || deckData;
+                    const commanderIds = deckData.commanderIds || [];
+                    const newCardIds = cardIds.filter(id => id !== cardId);
+                    const newCommanderIds = commanderIds.filter(id => id !== cardId);
+                    decks[name] = { cardIds: newCardIds, commanderIds: newCommanderIds };
+                });
+                saveDecks(decks);
+                renderSavedDecks();
+
+                showMessage(`Successfully deleted "${cardToDelete.name}".`, false);
+
+            } catch (error) {
+                console.error("Error deleting card:", error);
+                showMessage("Failed to delete card. Check console for details.", true);
+            }
+        };
+
+        const populateFormForEdit = (cardId) => {
+            const card = allCards.find(c => c.id === cardId);
+            if (!card) return;
+
+            editingCardId = cardId;
+            document.getElementById('cardName').value = card.name || '';
+            document.getElementById('cardType').value = card.type || 'Creature';
+            document.getElementById('manaCost').value = card.cost || '';
+            document.getElementById('cardText').value = card.text || '';
+            document.getElementById('power').value = card.power || '';
+            document.getElementById('toughness').value = card.toughness || '';
+            document.getElementById('loyalty').value = card.loyalty || '';
+
+            cardTypeSelect.dispatchEvent(new Event('change'));
+            
+            formTitleEl.textContent = `Editing: ${card.name}`;
+            saveCardBtn.textContent = 'Update Card';
+            cancelEditBtn.classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        const resetForm = () => {
+            document.getElementById('addCardForm').reset();
+            editingCardId = null;
+            formTitleEl.textContent = 'Create New Card';
+            saveCardBtn.textContent = 'Add to Collection';
+            cancelEditBtn.classList.add('hidden');
+            cardTypeSelect.dispatchEvent(new Event('change'));
         };
         
         const handleStartGame = () => {
@@ -409,7 +543,7 @@
             const initialGameState = {
                 players: {
                     p1: {
-                        uid: myUserId, // FIX: Include the user's ID
+                        uid: myUserId,
                         name: playerName,
                         deck: mainDeckForGame,
                         commander: commanders,
@@ -418,7 +552,7 @@
                         graveyard: [], 
                         exile: [],
                         life: startingLife,
-                        shuffled: false // Let the game board handle the first shuffle
+                        shuffled: false
                     }
                 },
                 createdAt: firebase.database.ServerValue.TIMESTAMP
@@ -580,12 +714,12 @@
                         try {
                             const batch = db.batch();
                             cardsToCreate.forEach(cardData => {
-                                const docRef = db.collection('cards').doc(); // Create a new doc with a random ID
+                                const docRef = db.collection('cards').doc();
                                 batch.set(docRef, cardData);
                             });
                             await batch.commit();
                             showMessage(`Successfully imported ${cardsToCreate.length} new cards! Reloading collection...`, false);
-                            await loadAllCardsFromFirebase(); // Refresh the collection view
+                            await loadAllCardsFromFirebase();
                         } catch (error) {
                             console.error("Error saving cards to Firestore:", error);
                             showMessage("An error occurred while saving new cards.", true);
@@ -599,10 +733,11 @@
         async function init() {
             try {
                 const { user } = await firebase.auth().signInAnonymously();
-                myUserId = user.uid; // FIX: Store the user's ID
+                myUserId = user.uid;
                 console.log("User signed in anonymously with UID:", myUserId);
 
-                addCardBtn.addEventListener('click', handleAddCard);
+                saveCardBtn.addEventListener('click', handleSaveCard);
+                cancelEditBtn.addEventListener('click', resetForm);
                 saveDeckBtn.addEventListener('click', handleSaveDeck);
                 startGameBtn.addEventListener('click', handleStartGame);
                 importCsvBtn.addEventListener('click', handleCsvImport);
