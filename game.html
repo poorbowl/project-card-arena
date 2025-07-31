@@ -277,7 +277,7 @@
                 <button id="library-search-close" class="text-3xl font-light text-gray-400 hover:text-white leading-none">&times;</button>
             </div>
             <input type="text" id="library-search-input" placeholder="Search by card name..." class="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white mb-4 flex-shrink-0">
-            <div id="library-search-content" class="card-container flex-grow overflow-y-auto justify-center"></div>
+            <div id="library-search-content" data-zone-name="deck" class="card-container flex-grow overflow-y-auto justify-center"></div>
         </div>
     </div>
 
@@ -686,7 +686,12 @@
                 const cardEl = event.currentTarget;
                 const instanceId = cardEl.dataset.instanceId;
                 const parentZoneEl = cardEl.closest('[data-zone-name]');
-                const parentZoneName = parentZoneEl ? parentZoneEl.dataset.zoneName : null;
+                let parentZoneName = parentZoneEl ? parentZoneEl.dataset.zoneName : null;
+                
+                // FIX: Correctly identify when a card is in the library search modal
+                if (cardEl.closest('#library-search-modal')) {
+                    parentZoneName = 'deck';
+                }
             
                 contextMenuCard = { instanceId, fromZone: parentZoneName };
             
@@ -729,9 +734,22 @@
                 }
             
                 contextMenu.innerHTML = menuHTML;
-                contextMenu.style.left = `${event.clientX}px`;
-                contextMenu.style.top = `${event.clientY}px`;
                 contextMenu.classList.remove('hidden');
+
+                const menuHeight = contextMenu.offsetHeight;
+                const menuWidth = contextMenu.offsetWidth;
+                let top = event.clientY;
+                let left = event.clientX;
+
+                if (top + menuHeight > window.innerHeight) {
+                    top = event.clientY - menuHeight;
+                }
+                if (left + menuWidth > window.innerWidth) {
+                    left = event.clientX - menuWidth;
+                }
+
+                contextMenu.style.left = `${left}px`;
+                contextMenu.style.top = `${top}px`;
             }
 
             function showLibraryContextMenu(event) {
@@ -1294,7 +1312,6 @@
                         const originalDeckSize = playerState.deck.length;
                         const restOfDeck = playerState.deck.slice(0, originalDeckSize - interactiveActionState.count);
                         
-                        // FIX: Correctly order the deck after scrying
                         const newDeck = [
                             ...interactiveActionState.toBottom,
                             ...restOfDeck, 
