@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Card Arena - Game Board</title>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <!-- Our Firebase Initialization -->
+    <script src="firebase-init.js"></script>
+    <!-- SortableJS for Drag and Drop -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Custom Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+        }
+        .game-zone {
+            border: 2px dashed rgba(255, 255, 255, 0.2);
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+            background-color: rgba(255, 255, 255, 0.05);
+            transition: background-color 0.2s;
+            position: relative;
+        }
+        .game-zone:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        .zone-title {
+            text-align: center;
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.4);
+            position: absolute;
+            top: 4px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+        }
+        .player-hand {
+            border-top: 2px solid rgba(99, 102, 241, 0.5);
+            background-color: rgba(17, 24, 39, 0.9);
+            backdrop-filter: blur(5px);
+        }
+        .card-in-library {
+            background-color: #374151;
+            border: 2px solid #4B5563;
+            width: 90%;
+            height: 10px;
+            border-radius: 2px;
+            position: absolute;
+            left: 5%;
+        }
+        .my-player-area {
+            outline: 2px solid #4f46e5;
+            box-shadow: 0 0 20px rgba(79, 70, 229, 0.5);
+        }
+        .card { /* Generic card class */
+            height: 140px; 
+            width: 100px;
+            border-radius: 0.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            cursor: grab;
+            background-size: cover;
+            background-position: center;
+            flex-shrink: 0;
+            transition: transform 0.2s ease-in-out; /* Add transition for tapping */
+        }
+        .card-in-hand:hover {
+            transform: scale(1.1) translateY(-10px);
+            z-index: 100;
+        }
+        .card.tapped {
+             transform: rotate(90deg);
+        }
+        .sortable-ghost {
+            opacity: 0.4;
+            background-color: #4f46e5;
+        }
+        .sortable-drag {
+            opacity: 0.9;
+            transform: scale(1.05);
+        }
+        /* NEW: Styles for the life total input */
+        .life-total-input {
+            background: transparent;
+            border: none;
+            color: white;
+            text-align: center;
+            width: 120px;
+        }
+        .life-total-input:focus {
+            outline: 1px solid #4f46e5;
+            border-radius: 4px;
+        }
+        /* Hide spinners on number input */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+          -webkit-appearance: none; 
+          margin: 0; 
+        }
+        input[type=number] {
+          -moz-appearance: textfield;
+        }
+    </style>
+</head>
+<body class="bg-gray-800 text-white h-screen flex flex-col">
+
+    <div class="absolute top-2 left-2 bg-black/50 p-2 rounded-lg text-xs z-10">
+        Game ID: <span id="gameIdDisplay"></span>
+    </div>
+
+    <main class="main-grid flex-grow p-2">
+    </main>
+    
+    <div id="main-player-hand-area" class="player-hand flex-shrink-0 h-48 p-2 flex items-center justify-center gap-2 relative hidden">
+        <div class="zone-title">HAND</div>
+        <div id="main-player-hand-cards" data-zone-name="hand" class="w-full h-full flex justify-center items-center gap-2"></div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            let gameState = {};
+            let myPlayerId = null; 
+            let myUserId = null;   
+            let gameId = null;
+            let gameRef = null;
+            let sortableInstances = [];
+
+            const mainGridEl = document.querySelector('.main-grid');
+            const handAreaEl = document.getElementById('main-player-hand-area');
+            const handCardsEl = document.getElementById('main-player-hand-cards');
+            const gameIdDisplayEl = document.getElementById('gameIdDisplay');
+
+            function shuffle(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+            }
+            
+            function getPlayerOrder(players) {
+                const playerIds = Object.keys(players).sort(); 
+                const myIndex = playerIds.indexOf(myPlayerId);
+                if (myIndex === -1) return playerIds; 
+                return [...playerIds.slice(myIndex), ...playerIds.slice(0, myIndex)];
+            }
+
+            function getZoneAsArray(playerState, zoneKey) {
+                const zone = playerState[zoneKey];
+                if (!zone) return [];
+                if (Array.isArray(zone)) return zone.filter(Boolean);
+                return Object.values(zone);
+            }
+            
+            function createCardElement(card, zoneName) {
+                const isHand = zoneName === 'hand';
+                const el = document.createElement(isHand ? 'img' : 'div');
+                el.dataset.instanceId = card.instanceId;
+                if (isHand) {
+                    el.className = 'card card-in-hand';
+                    el.src = card.imageUrl;
+                    el.alt = card.name;
+                } else {
+                    el.className = 'card card-in-battlefield';
+                    el.style.backgroundImage = `url(${card.imageUrl})`;
+                }
+                if (card.tapped) {
+                    el.classList.add('tapped');
+                }
+                return el;
+            }
+
+            function updateCardContainer(containerEl, newCards, zoneName) {
+                const existingCardElements = new Map();
+                containerEl.querySelectorAll('.card').forEach(el => {
+                    existingCardElements.set(el.dataset.instanceId, el);
+                });
+
+                const newCardIds = new Set(newCards.map(c => c.instanceId));
+
+                existingCardElements.forEach((el, instanceId) => {
+                    if (!newCardIds.has(instanceId)) {
+                        containerEl.removeChild(el);
+                    }
+                });
+
+                newCards.forEach((cardData, index) => {
+                    let cardEl = existingCardElements.get(cardData.instanceId);
+                    if (!cardEl) {
+                        cardEl = createCardElement(cardData, zoneName);
+                    } else {
+                        cardEl.classList.toggle('tapped', !!cardData.tapped);
+                    }
+                    
+                    if (containerEl.children[index] !== cardEl) {
+                        containerEl.insertBefore(cardEl, containerEl.children[index]);
+                    }
+                });
+            }
+
+            function renderBoard() {
+                if (!gameState || !gameState.players || !myPlayerId) return;
+
+                const orderedPlayerIds = getPlayerOrder(gameState.players);
+                const playerCount = orderedPlayerIds.length;
+                const boardPlayerCount = mainGridEl.querySelectorAll('.player-area').length;
+                
+                if (playerCount !== boardPlayerCount) {
+                    setupBoardHTML(orderedPlayerIds);
+                }
+
+                orderedPlayerIds.forEach(playerId => {
+                    const playerState = gameState.players[playerId];
+                    if (!playerState) return;
+
+                    const battlefieldEl = document.getElementById(`${playerId}-battlefield`);
+                    if (battlefieldEl) {
+                        const battlefieldCards = getZoneAsArray(playerState, 'battlefield');
+                        updateCardContainer(battlefieldEl, battlefieldCards, 'battlefield');
+                    }
+
+                    document.getElementById(`${playerId}-library`).querySelector('.zone-title').textContent = `LIBRARY (${getZoneAsArray(playerState, 'deck').length})`;
+                    document.getElementById(`${playerId}-graveyard`).querySelector('.zone-title').textContent = `GRAVEYARD (${getZoneAsArray(playerState, 'graveyard').length})`;
+                    document.getElementById(`${playerId}-exile`).querySelector('.zone-title').textContent = `EXILE (${getZoneAsArray(playerState, 'exile').length})`;
+                    document.getElementById(`${playerId}-life-total`).value = playerState.life ?? 40;
+                });
+
+                const myPlayerState = gameState.players[myPlayerId];
+                if (myPlayerState) {
+                    const handCards = getZoneAsArray(myPlayerState, 'hand');
+                    handAreaEl.classList.remove('hidden');
+                    updateCardContainer(handCardsEl, handCards, 'hand');
+                    handAreaEl.querySelector('.zone-title').textContent = `HAND (${handCards.length})`;
+                }
+                
+                initializeDragAndDrop();
+                addClickListenersToMyCards();
+            }
+
+            function setupBoardHTML(orderedPlayerIds) {
+                const playerCount = orderedPlayerIds.length;
+                let gridWrapperClass = 'w-full h-full grid gap-2';
+                if (playerCount <= 2) {
+                    gridWrapperClass += ' grid-rows-2';
+                } else {
+                    gridWrapperClass += ' grid-cols-2 grid-rows-2';
+                }
+                const screenPositions = {
+                    1: ['row-start-2 col-span-2'],
+                    2: ['row-start-2', 'row-start-1'],
+                    3: ['row-start-2 col-span-2', 'row-start-1 col-start-1', 'row-start-1 col-start-2'],
+                    4: ['row-start-2 col-start-1', 'row-start-1 col-start-1', 'row-start-1 col-start-2', 'row-start-2 col-start-2']
+                };
+                const positionsToUse = screenPositions[playerCount] || [];
+                
+                let boardHTML = `<div class="${gridWrapperClass}">`;
+                orderedPlayerIds.forEach((playerId, index) => {
+                    const isMe = playerId === myPlayerId;
+                    boardHTML += `
+                        <div id="player-area-${playerId}" class="player-area bg-gray-900/80 rounded-lg p-2 flex gap-2 overflow-hidden ${positionsToUse[index] || ''} ${isMe ? 'my-player-area' : ''}">
+                            <div class="flex-shrink-0 w-24 md:w-32 lg:w-40 flex flex-col gap-2">
+                                <div id="${playerId}-commander" data-zone-name="commander" class="game-zone h-1/4"><div class="zone-title">COMMANDER</div></div>
+                                <div id="${playerId}-library" data-zone-name="library" class="game-zone h-1/4 ${isMe ? 'cursor-pointer' : ''}"><div class="zone-title">LIBRARY</div></div>
+                                <div id="${playerId}-graveyard" data-zone-name="graveyard" class="game-zone h-1/4"><div class="zone-title">GRAVEYARD</div></div>
+                                <div id="${playerId}-exile" data-zone-name="exile" class="game-zone h-1/4"><div class="zone-title">EXILE</div></div>
+                            </div>
+                            <div id="${playerId}-battlefield" data-zone-name="battlefield" class="game-zone flex-grow flex items-start content-start flex-wrap gap-2 p-4 pt-8">
+                                <div class="zone-title">BATTLEFIELD</div>
+                            </div>
+                            <div class="flex-shrink-0 w-24 md:w-32 flex flex-col items-center justify-center bg-gray-800/80 rounded-lg p-2">
+                                <span class="font-bold text-gray-400 text-xs md:text-sm">${isMe ? 'YOU' : 'OPPONENT'}</span>
+                                <input type="number" id="${playerId}-life-total" class="life-total-input text-4xl lg:text-5xl font-bold" value="40" ${isMe ? '' : 'readonly'}>
+                                <div class="flex gap-1 md:gap-2 mt-2">
+                                    <button data-player-id="${playerId}" data-action="decrement" class="bg-red-600 w-8 h-8 md:w-10 md:h-10 text-xl md:text-2xl rounded-full">-</button>
+                                    <button data-player-id="${playerId}" data-action="increment" class="bg-green-600 w-8 h-8 md:w-10 md:h-10 text-xl md:text-2xl rounded-full">+</button>
+                                </div>
+                            </div>
+                        </div>`;
+                });
+                boardHTML += `</div>`;
+                mainGridEl.innerHTML = boardHTML;
+                
+                document.getElementById(`${myPlayerId}-library`).addEventListener('click', drawCard);
+            }
+
+            function drawCard() {
+                const playerRef = gameRef.child('players').child(myPlayerId);
+                playerRef.transaction(playerState => {
+                    if (playerState) {
+                        let deck = getZoneAsArray(playerState, 'deck');
+                        if (deck.length > 0) {
+                            const cardToDraw = deck.pop();
+                            cardToDraw.instanceId = `card-${Date.now()}-${Math.random()}`;
+                            let hand = getZoneAsArray(playerState, 'hand');
+                            hand.push(cardToDraw);
+                            playerState.deck = deck;
+                            playerState.hand = hand;
+                        }
+                    }
+                    return playerState;
+                });
+            }
+
+            function initializeDragAndDrop() {
+                sortableInstances.forEach(s => s.destroy());
+                sortableInstances = [];
+                if (!myPlayerId) return;
+                const zones = document.querySelectorAll(`[id^="${myPlayerId}-"][data-zone-name], #main-player-hand-cards`);
+                zones.forEach(zoneEl => {
+                     const options = {
+                        group: 'cards',
+                        animation: 150,
+                        ghostClass: 'sortable-ghost',
+                        dragClass: 'sortable-drag',
+                        onEnd: handleCardMove
+                    };
+                    sortableInstances.push(new Sortable(zoneEl, options));
+                });
+            }
+
+            function handleCardClick(event) {
+                const cardEl = event.currentTarget;
+                const instanceId = cardEl.dataset.instanceId;
+                const playerRef = gameRef.child('players').child(myPlayerId);
+
+                playerRef.transaction(playerState => {
+                    if (playerState) {
+                        const battlefield = getZoneAsArray(playerState, 'battlefield');
+                        const cardIndex = battlefield.findIndex(c => c.instanceId === instanceId);
+                        if (cardIndex > -1) {
+                            battlefield[cardIndex].tapped = !battlefield[cardIndex].tapped;
+                            playerState.battlefield = battlefield;
+                        }
+                    }
+                    return playerState;
+                });
+            }
+
+            function addClickListenersToMyCards() {
+                if (!myPlayerId) return;
+                const myBattlefield = document.getElementById(`${myPlayerId}-battlefield`);
+                if (myBattlefield) {
+                    myBattlefield.querySelectorAll('.card').forEach(cardEl => {
+                        cardEl.addEventListener('click', handleCardClick);
+                    });
+                }
+            }
+
+            function handleCardMove(event) {
+                const cardEl = event.item;
+                const instanceId = cardEl.dataset.instanceId;
+                const fromZoneEl = event.from;
+                const toZoneEl = event.to;
+                if (!instanceId || fromZoneEl === toZoneEl) return;
+                const fromKey = fromZoneEl.dataset.zoneName;
+                const toKey = toZoneEl.dataset.zoneName;
+                if (!fromKey || !toKey) return;
+                
+                const playerRef = gameRef.child('players').child(myPlayerId);
+                playerRef.transaction(playerState => {
+                    if (playerState) {
+                        let fromArray = getZoneAsArray(playerState, fromKey);
+                        let toArray = getZoneAsArray(playerState, toKey);
+                        const cardIndex = fromArray.findIndex(c => c.instanceId === instanceId);
+                        if (cardIndex !== -1) {
+                            const [cardToMove] = fromArray.splice(cardIndex, 1);
+                            if (toKey === 'battlefield') {
+                                delete cardToMove.tapped;
+                            }
+                            toArray.splice(event.newIndex, 0, cardToMove);
+                            playerState[fromKey] = fromArray;
+                            playerState[toKey] = toArray;
+                        }
+                    }
+                    return playerState;
+                });
+            }
+
+            // MODIFIED: Function to handle life total button clicks with limits
+            function handleLifeChange(playerId, action) {
+                const playerLifeRef = gameRef.child('players').child(playerId).child('life');
+                playerLifeRef.transaction(currentLife => {
+                    if (currentLife === null) currentLife = 40;
+                    if (action === 'increment' && currentLife < 999) {
+                        return currentLife + 1;
+                    }
+                    if (action === 'decrement' && currentLife > 0) {
+                        return currentLife - 1;
+                    }
+                    return currentLife; // Return current value if no change is made
+                });
+            }
+
+            // MODIFIED: Function to handle direct text entry for life total with limits
+            function handleLifeTextEntry(event) {
+                const lifeEl = event.target;
+                let newLife = parseInt(lifeEl.value, 10);
+                if (isNaN(newLife)) {
+                    lifeEl.value = gameState.players[myPlayerId]?.life ?? 40; // Revert on invalid input
+                    return;
+                }
+                
+                // Clamp the value between 0 and 999
+                newLife = Math.max(0, Math.min(newLife, 999));
+                
+                // Set the value in Firebase
+                gameRef.child('players').child(myPlayerId).child('life').set(newLife);
+            }
+
+            async function initializeGame() {
+                // Attach delegated event listeners for life counters
+                mainGridEl.addEventListener('click', (event) => {
+                    const button = event.target.closest('button[data-player-id]');
+                    // Only allow changing my own life total
+                    if (!button || button.dataset.playerId !== myPlayerId) return;
+                    handleLifeChange(button.dataset.playerId, button.dataset.action);
+                });
+                mainGridEl.addEventListener('change', (event) => {
+                    if (event.target.id === `${myPlayerId}-life-total`) {
+                        handleLifeTextEntry(event);
+                    }
+                });
+
+                const urlParams = new URLSearchParams(window.location.search);
+                gameId = urlParams.get('gameId');
+                gameIdDisplayEl.textContent = gameId;
+
+                if (!gameId) {
+                    document.body.innerHTML = '<h1 class="text-red-500 text-2xl p-8">Error: No game ID provided.</h1>';
+                    return;
+                }
+                gameRef = realdb.ref(`games/${gameId}`);
+
+                try {
+                    const { user } = await firebase.auth().signInAnonymously();
+                    myUserId = user.uid;
+                    console.log("Signed in with temp user ID:", myUserId);
+
+                    await gameRef.transaction(currentGameState => {
+                        if (currentGameState) {
+                            let isAlreadyInGame = false;
+                            if (currentGameState.players) {
+                                Object.entries(currentGameState.players).forEach(([pId, pData]) => {
+                                    if (pData.uid === myUserId) {
+                                        isAlreadyInGame = true;
+                                        myPlayerId = pId;
+                                    }
+                                });
+                            } else {
+                                currentGameState.players = {};
+                            }
+
+                            if (!isAlreadyInGame) {
+                                const p1 = currentGameState.players.p1;
+                                if (p1 && !p1.uid) { 
+                                    myPlayerId = 'p1';
+                                    p1.uid = myUserId;
+                                    console.log(`User ${myUserId} is claiming creator slot p1.`);
+                                } else { 
+                                    const openSlot = ['p2', 'p3', 'p4'].find(slot => !currentGameState.players[slot]);
+                                    if (openSlot) {
+                                        myPlayerId = openSlot;
+                                        currentGameState.players[openSlot] = { uid: myUserId, life: 40, deck: [], hand: [], battlefield: [], graveyard:[], exile:[], commander:[], shuffled: true };
+                                        console.log(`User ${myUserId} is joining as ${openSlot}`);
+                                    }
+                                }
+                            }
+
+                            const p1 = currentGameState.players.p1;
+                             if (myPlayerId === 'p1' && p1 && p1.deck && !p1.shuffled) {
+                                console.log("P1 deck not shuffled, shuffling now.");
+                                const deckToShuffle = getZoneAsArray({deck: p1.deck}, 'deck');
+                                shuffle(deckToShuffle);
+                                p1.deck = deckToShuffle;
+                                p1.shuffled = true;
+                            }
+                        }
+                        return currentGameState;
+                    });
+
+
+                    gameRef.on('value', (snapshot) => {
+                        const newGameState = snapshot.val();
+                        if (newGameState) {
+                            gameState = newGameState;
+                            renderBoard();
+                        }
+                    });
+
+                } catch (error) {
+                    console.error("Initialization failed:", error);
+                    document.body.innerHTML = '<h1 class="text-red-500 text-2xl p-8">Error: Could not connect to the server.</h1>';
+                }
+            }
+            
+            initializeGame();
+        });
+    </script>
+</body>
+</html>

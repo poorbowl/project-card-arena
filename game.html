@@ -239,6 +239,10 @@
     <div id="deck-selection-modal" class="hidden fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
          <div class="bg-gray-800 rounded-lg max-w-md w-full p-6 shadow-2xl border border-indigo-500">
             <h2 class="text-2xl font-bold mb-4 text-indigo-300">Select Your Deck</h2>
+            <div class="mb-4">
+                <label for="joiningPlayerName" class="block text-sm font-medium text-gray-400">Your Name</label>
+                <input type="text" id="joiningPlayerName" placeholder="Enter your name..." class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+            </div>
             <p class="text-gray-400 mb-6">Choose one of your saved decks to join the game.</p>
             <div id="deck-selection-list" class="space-y-2">
             </div>
@@ -407,7 +411,7 @@
                 if (!gameState || !gameState.players || !myPlayerId) return;
 
                 const myPlayerState = gameState.players[myPlayerId];
-                if (myPlayerId !== 'p1' && !myPlayerState.shuffled) {
+                if (myPlayerId !== 'p1' && !myPlayerState.deckLoaded) {
                     showDeckSelectionModal();
                     return;
                 }
@@ -425,6 +429,14 @@
                     const playerState = gameState.players[playerId];
                     if (!playerState) return;
                     
+                    const playerArea = document.getElementById(`player-area-${playerId}`);
+                    if(playerArea) {
+                        const nameEl = playerArea.querySelector('.player-name-display');
+                        if (nameEl) {
+                           nameEl.textContent = playerState.name || (playerId === myPlayerId ? 'YOU' : 'OPPONENT');
+                        }
+                    }
+                    
                     const battlefieldEl = document.getElementById(`${playerId}-battlefield-cards`);
                     if (battlefieldEl) {
                         updateCardContainer(battlefieldEl, playerState.battlefield || []);
@@ -436,10 +448,8 @@
                     document.getElementById(`${playerId}-library`).querySelector('.zone-title').textContent = `LIBRARY (${(playerState.deck || []).length})`;
                     document.getElementById(`${playerId}-life-total`).value = playerState.life ?? 40;
 
-                    // RE-APPLIED FIX:
-                    // This line was removed by the other LLM, causing the bug to reappear.
-                    // It cleans up stray card elements from the side zones on every render.
-                    document.querySelectorAll(`#${playerId}-graveyard .card, #${playerId}-exile .card, #${playerId}-commander .card`).forEach(c => c.remove());
+                    // FIX: Clean up ALL non-battlefield zones to prevent visual artifacts
+                    document.querySelectorAll(`#${playerId}-graveyard .card, #${playerId}-exile .card, #${playerId}-library .card, #${playerId}-commander .card`).forEach(c => c.remove());
                 });
 
                 if (myPlayerState) {
@@ -471,13 +481,14 @@
                 let boardHTML = `<div class="${gridWrapperClass}">`;
                 orderedPlayerIds.forEach((playerId, index) => {
                     const isMe = playerId === myPlayerId;
+                    const playerState = gameState.players[playerId] || {};
                     boardHTML += `
                         <div id="player-area-${playerId}" class="player-area bg-gray-900/80 rounded-lg p-2 flex gap-2 overflow-hidden ${positionsToUse[index] || ''} ${isMe ? 'my-player-area' : ''}">
                             <div class="flex-shrink-0 w-24 md:w-32 lg:w-40 flex flex-col gap-2">
-                                <div id="${playerId}-commander" data-zone-name="commander" class="game-zone h-1/4 clickable-zone"><div class="zone-title">COMMANDER (0)</div><div class="card-container"></div></div>
-                                <div id="${playerId}-library" data-zone-name="library" class="game-zone h-1/4 ${isMe ? 'clickable-zone' : ''}"><div class="zone-title">LIBRARY (0)</div><div class="card-container"></div></div>
-                                <div id="${playerId}-graveyard" data-zone-name="graveyard" class="game-zone h-1/4 clickable-zone"><div class="zone-title">GRAVEYARD (0)</div><div class="card-container"></div></div>
-                                <div id="${playerId}-exile" data-zone-name="exile" class="game-zone h-1/4 clickable-zone"><div class="zone-title">EXILE (0)</div><div class="card-container"></div></div>
+                                <div id="${playerId}-commander" class="game-zone h-1/4 clickable-zone"><div class="zone-title">COMMANDER (0)</div><div id="${playerId}-commander-cards" data-zone-name="commander" class="card-container"></div></div>
+                                <div id="${playerId}-library" class="game-zone h-1/4 ${isMe ? 'clickable-zone' : ''}"><div class="zone-title">LIBRARY (0)</div><div data-zone-name="library" class="card-container"></div></div>
+                                <div id="${playerId}-graveyard" class="game-zone h-1/4 clickable-zone"><div class="zone-title">GRAVEYARD (0)</div><div data-zone-name="graveyard" class="card-container"></div></div>
+                                <div id="${playerId}-exile" class="game-zone h-1/4 clickable-zone"><div class="zone-title">EXILE (0)</div><div data-zone-name="exile" class="card-container"></div></div>
                             </div>
                             <div id="${playerId}-battlefield-wrapper" class="game-zone flex-grow">
                                 <div class="zone-title">BATTLEFIELD</div>
@@ -485,7 +496,7 @@
                             </div>
                             <div class="flex-shrink-0 w-24 md:w-32 flex flex-col items-center justify-center bg-gray-800/80 rounded-lg p-2">
                                 ${isMe ? '<button id="create-token-btn" class="w-full mb-2 bg-indigo-600 text-white text-xs py-1 rounded">Create Token</button>' : ''}
-                                <span class="font-bold text-gray-400 text-xs md:text-sm">${isMe ? 'YOU' : 'OPPONENT'}</span>
+                                <span class="player-name-display font-bold text-gray-400 text-xs md:text-sm">${playerState.name || (isMe ? 'YOU' : 'OPPONENT')}</span>
                                 <input type="number" id="${playerId}-life-total" class="life-total-input text-4xl lg:text-5xl font-bold" value="40" ${isMe ? '' : 'readonly'}>
                                 <div class="flex gap-1 md:gap-2 mt-2">
                                     <button data-player-id="${playerId}" data-action="decrement" class="bg-red-600 w-8 h-8 md:w-10 md:h-10 text-xl md:text-2xl rounded-full">-</button>
@@ -499,9 +510,14 @@
                 
                 document.querySelectorAll('.clickable-zone').forEach(el => {
                     const playerId = el.id.split('-')[0];
-                    const zoneName = el.dataset.zoneName;
+                    const zoneName = el.id.split('-')[1]; 
+                    
                     if (zoneName === 'library' && playerId === myPlayerId) {
                         el.addEventListener('click', drawCard);
+                        el.addEventListener('contextmenu', (e) => {
+                            e.preventDefault();
+                            promptViewTopCards();
+                        });
                     } else { 
                         el.addEventListener('click', () => openZoneViewer(playerId, zoneName));
                     }
@@ -523,6 +539,19 @@
                     }
                     return playerState;
                 });
+            }
+
+            function promptViewTopCards() {
+                const countStr = prompt("How many cards from the top of your library would you like to view?");
+                if (countStr) {
+                    const count = parseInt(countStr, 10);
+                    if (!isNaN(count) && count > 0) {
+                        const playerState = gameState.players[myPlayerId];
+                        const deck = playerState.deck || [];
+                        const topCards = deck.slice(-count);
+                        openZoneViewer(myPlayerId, 'library', topCards);
+                    }
+                }
             }
 
             function initializeDragAndDrop() {
@@ -583,10 +612,9 @@
             
                 if (parentZoneName === 'battlefield') {
                     const cardData = gameState.players[myPlayerId]?.battlefield.find(c => c.instanceId === instanceId);
-                    // NEW FEATURE: Check if the card is a token
                     if (cardData && cardData.isToken) {
                         menuHTML = `<div><button class="context-menu-button" data-action="delete-token">Delete Token</button></div>`;
-                    } else if (cardData) { // It's a regular card
+                    } else if (cardData) {
                         if (cardData.counters && Object.keys(cardData.counters).length > 0) {
                             Object.entries(cardData.counters).forEach(([name, count]) => {
                                 const decodedName = decodeFirebaseKey(name);
@@ -608,7 +636,7 @@
                                          <button data-action="add-counter" class="w-full bg-indigo-600 text-white text-sm py-1 rounded">Add</button>
                                      </div>`;
                     }
-                } else { // Card is not on the battlefield
+                } else {
                     menuHTML += '<div>';
                     const targetZones = ['Hand', 'Battlefield', 'Graveyard', 'Exile', 'Commander', 'Library (Top)', 'Library (Bottom)'];
                     targetZones.forEach(zone => {
@@ -647,7 +675,7 @@
                 } else if (action === 'move-to') {
                     const toZone = button.dataset.zone;
                     moveCardToZone(toZone);
-                } else if (action === 'delete-token') { // NEW FEATURE: Handle token deletion
+                } else if (action === 'delete-token') {
                     deleteToken();
                 }
             }
@@ -823,16 +851,16 @@
                 gameRef.child('players').child(myPlayerId).child('life').set(newLife);
             }
             
-            function openZoneViewer(playerId, zoneName) {
+            function openZoneViewer(playerId, zoneName, cardsToShow = null) {
                  if (modalSortable) modalSortable.destroy();
 
                 const playerState = gameState.players[playerId];
                 if (!playerState) return;
                 
                 const actualZoneName = zoneName === 'library' ? 'deck' : zoneName;
-                const cards = playerState[actualZoneName] || [];
+                const cards = cardsToShow !== null ? cardsToShow : (playerState[actualZoneName] || []);
 
-                const ownerName = playerId === myPlayerId ? 'Your' : `${playerId}'s`;
+                const ownerName = playerId === myPlayerId ? 'Your' : `${playerState.name}'s`;
                 zoneViewerTitle.textContent = `${ownerName} ${zoneName.charAt(0).toUpperCase() + zoneName.slice(1)}`;
                 zoneViewerContent.innerHTML = '';
                 zoneViewerContent.dataset.zoneName = zoneName;
@@ -850,7 +878,7 @@
                 
                 addClickListenersToMyCards(); 
 
-                if (playerId === myPlayerId) {
+                if (playerId === myPlayerId && cardsToShow === null) {
                     modalSortable = new Sortable(zoneViewerContent, {
                         group: 'cards',
                         animation: 150,
@@ -883,9 +911,17 @@
                         button.className = 'deck-select-button';
                         button.textContent = deckName;
                         button.addEventListener('click', () => {
-                            const deckIds = savedDecks[deckName];
-                            const fullDeck = deckIds.map(id => allCardsFromDb.find(card => card.id === id)).filter(Boolean);
-                            loadDeckForPlayer(fullDeck);
+                            const playerName = document.getElementById('joiningPlayerName').value.trim();
+                            if (!playerName) {
+                                alert("Please enter your name."); // Replace with a better modal later
+                                return;
+                            }
+                            const deckData = savedDecks[deckName];
+                            const cardIds = deckData.cardIds || deckData;
+                            const commanderIds = deckData.commanderIds || [];
+                            const fullDeck = cardIds.map(id => allCardsFromDb.find(card => card.id === id)).filter(Boolean);
+                            const commanders = commanderIds.map(id => allCardsFromDb.find(card => card.id === id)).filter(Boolean);
+                            loadDeckForPlayer(fullDeck, commanders, playerName);
                         });
                         deckSelectionList.appendChild(button);
                     }
@@ -893,12 +929,17 @@
                 deckSelectionModal.classList.remove('hidden');
             }
 
-            function loadDeckForPlayer(deck) {
-                if (!myPlayerId || !deck || deck.length === 0) return;
+            function loadDeckForPlayer(deck, commanders, playerName) {
+                if (!myPlayerId || !deck) return;
                 shuffle(deck);
+                commanders.forEach(c => {
+                    if (!c.instanceId) c.instanceId = `card-${Date.now()}-${Math.random()}`;
+                });
                 gameRef.child('players').child(myPlayerId).update({
+                    name: playerName,
                     deck: deck,
-                    shuffled: true
+                    commander: commanders,
+                    deckLoaded: true
                 });
                 deckSelectionModal.classList.add('hidden');
             }
@@ -920,8 +961,7 @@
                 });
                 tokenCreatorModal.classList.add('hidden');
             }
-
-            // NEW FEATURE: Function to delete a token
+            
             function deleteToken() {
                 if (!contextMenuCard) return;
                 const { instanceId } = contextMenuCard;
@@ -1052,24 +1092,27 @@
 
                             if (!isAlreadyInGame) {
                                 const p1 = currentGameState.players.p1;
-                                if (p1 && !p1.uid) { 
-                                    myPlayerId = 'p1';
-                                    p1.uid = myUserId;
-                                } else { 
-                                    const openSlot = ['p2', 'p3', 'p4'].find(slot => !currentGameState.players[slot]);
-                                    if (openSlot) {
-                                        myPlayerId = openSlot;
-                                        currentGameState.players[openSlot] = { uid: myUserId, life: 40, deck: [], hand: [], battlefield: [], graveyard:[], exile:[], commander:[] };
-                                    }
+                                const openSlot = ['p2', 'p3', 'p4'].find(slot => !currentGameState.players[slot]);
+                                if (openSlot) {
+                                    myPlayerId = openSlot;
+                                    const startingLife = p1 ? p1.life : 40; 
+                                    currentGameState.players[openSlot] = { uid: myUserId, name: `Player ${openSlot.slice(1)}`, life: startingLife, deck: [], hand: [], battlefield: [], graveyard:[], exile:[], commander:[], deckLoaded: false };
                                 }
                             }
 
                             const p1 = currentGameState.players.p1;
-                             if (myPlayerId === 'p1' && p1 && p1.deck && !p1.shuffled) {
-                                const deck = p1.deck || [];
-                                shuffle(deck);
-                                p1.deck = deck;
-                                p1.shuffled = true;
+                             if (myPlayerId === 'p1' && p1) {
+                                if (p1.deck && !p1.shuffled) {
+                                    const deck = p1.deck || [];
+                                    shuffle(deck);
+                                    p1.deck = deck;
+                                    p1.shuffled = true;
+                                }
+                                if (p1.commander && p1.commander.length > 0) {
+                                    p1.commander.forEach(c => {
+                                        if (!c.instanceId) c.instanceId = `card-${Date.now()}-${Math.random()}`;
+                                    });
+                                }
                             }
                         }
                         return currentGameState;

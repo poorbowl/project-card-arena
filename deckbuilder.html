@@ -146,7 +146,6 @@
     <div class="mt-8 bg-gray-900 p-6 rounded-lg shadow-lg">
         <h2 class="text-2xl font-semibold mb-4 text-green-400">Game Lobby</h2>
         
-        <!-- NEW: Player Name and Game Mode Fields -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
                 <label for="playerName" class="block text-sm font-medium text-gray-400">Your Name</label>
@@ -186,7 +185,8 @@
         let allCards = [];
         let currentDeck = [];
         let commanders = [];
-        let uploadedImageMap = new Map(); // To store uploaded image names and their URLs
+        let uploadedImageMap = new Map();
+        let myUserId = null; // Variable to hold the user's ID
 
         // --- TABS & FORM LOGIC ---
         const tabBtns = document.querySelectorAll('.tab-button');
@@ -409,6 +409,7 @@
             const initialGameState = {
                 players: {
                     p1: {
+                        uid: myUserId, // FIX: Include the user's ID
                         name: playerName,
                         deck: mainDeckForGame,
                         commander: commanders,
@@ -416,7 +417,8 @@
                         battlefield: [], 
                         graveyard: [], 
                         exile: [],
-                        life: startingLife
+                        life: startingLife,
+                        shuffled: false // Let the game board handle the first shuffle
                     }
                 },
                 createdAt: firebase.database.ServerValue.TIMESTAMP
@@ -596,18 +598,16 @@
         // --- INITIALIZATION ---
         async function init() {
             try {
-                // FIX: Authenticate the user anonymously before doing anything else
-                await firebase.auth().signInAnonymously();
-                console.log("User signed in anonymously.");
+                const { user } = await firebase.auth().signInAnonymously();
+                myUserId = user.uid; // FIX: Store the user's ID
+                console.log("User signed in anonymously with UID:", myUserId);
 
-                // Add event listeners
                 addCardBtn.addEventListener('click', handleAddCard);
                 saveDeckBtn.addEventListener('click', handleSaveDeck);
                 startGameBtn.addEventListener('click', handleStartGame);
                 importCsvBtn.addEventListener('click', handleCsvImport);
                 document.getElementById('bulkImageUpload').addEventListener('change', handleImageUpload);
                 
-                // Load initial data
                 await loadAllCardsFromFirebase();
                 renderSavedDecks();
                 cardTypeSelect.dispatchEvent(new Event('change'));

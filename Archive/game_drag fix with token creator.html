@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Card Arena - Game Board</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="firebase-init.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+        }
+        .game-zone {
+            border: 2px dashed rgba(255, 255, 255, 0.2);
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+            background-color: rgba(255, 255, 255, 0.05);
+            transition: background-color 0.2s;
+            position: relative;
+            display: flex; 
+            flex-direction: column;
+        }
+        .clickable-zone {
+             cursor: pointer;
+        }
+        .game-zone:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        .zone-title {
+            text-align: center;
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.4);
+            position: absolute;
+            top: 4px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            z-index: 10;
+            pointer-events: none;
+        }
+        .player-hand {
+            border-top: 2px solid rgba(99, 102, 241, 0.5);
+            background-color: rgba(17, 24, 39, 0.9);
+            backdrop-filter: blur(5px);
+        }
+        .my-player-area {
+            outline: 2px solid #4f46e5;
+            box-shadow: 0 0 20px rgba(79, 70, 229, 0.5);
+        }
+        .card { 
+            height: 140px; 
+            width: 100px;
+            border-radius: 0.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            cursor: grab;
+            background-size: cover;
+            background-position: center;
+            flex-shrink: 0;
+            transition: transform 0.2s ease-in-out;
+            position: relative; 
+            background-color: #4b5563; /* For tokens */
+        }
+        .card:hover {
+            transform: scale(1.1);
+            z-index: 100;
+        }
+        .card.tapped {
+           transform: rotate(90deg);
+        }
+        .sortable-ghost {
+            opacity: 0.4;
+            background-color: #4f46e5;
+        }
+        .sortable-drag {
+            opacity: 0.9;
+            transform: scale(1.05);
+        }
+        .life-total-input {
+            background: transparent;
+            border: none;
+            color: white;
+            text-align: center;
+            width: 120px;
+        }
+        .life-total-input:focus {
+            outline: 1px solid #4f46e5;
+            border-radius: 4px;
+        }
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+          -webkit-appearance: none; 
+          margin: 0; 
+        }
+        input[type=number] {
+          -moz-appearance: textfield;
+        }
+        .card-container {
+            flex-grow: 1;
+            padding-top: 1.5rem; 
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-content: flex-start;
+        }
+        .context-menu {
+            position: fixed;
+            z-index: 10000;
+            background-color: #1f2937; 
+            border: 1px solid #4f46e5;
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            width: 220px;
+        }
+        .context-menu-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.25rem 0.5rem;
+            color: white;
+            border-radius: 0.25rem;
+        }
+         .context-menu-button {
+            display: block;
+            width: 100%;
+            padding: 0.5rem;
+            text-align: left;
+            border-radius: 0.25rem;
+        }
+        .context-menu-button:hover {
+           background-color: #4f46e5;
+        }
+        .context-menu-divider {
+            height: 1px;
+            background-color: #374151;
+            margin: 0.5rem 0;
+        }
+        .context-menu-input {
+            background-color: #374151;
+            border: 1px solid #4b5563;
+            color: white;
+            border-radius: 0.25rem;
+            padding: 0.25rem 0.5rem;
+            width: 100%;
+        }
+        .counter-badge-container {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            align-items: flex-end;
+        }
+        .counter-badge {
+            background-color: rgba(17, 24, 39, 0.8);
+            color: white;
+            border-radius: 0.25rem;
+            padding: 1px 5px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            border: 1px solid rgba(255,255,255,0.4);
+            white-space: nowrap;
+        }
+        .deck-select-button {
+            display: block;
+            width: 100%;
+            background-color: #374151;
+            border: 1px solid #4b5563;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            text-align: left;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+        .deck-select-button:hover {
+            background-color: #4f46e5;
+        }
+        .token {
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            text-align: center;
+            font-size: 12px;
+            border: 2px solid #6b7280;
+        }
+        .token-name {
+            font-weight: bold;
+        }
+        .token-pt {
+            align-self: flex-end;
+            background-color: rgba(17, 24, 39, 0.8);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="bg-gray-800 text-white h-screen flex flex-col">
+
+    <div class="absolute top-2 left-2 bg-black/50 p-2 rounded-lg text-xs z-20">
+        Game ID: <span id="gameIdDisplay"></span>
+    </div>
+
+    <main class="main-grid flex-grow p-2">
+    </main>
+    
+    <div id="main-player-hand-area" class="player-hand flex-shrink-0 h-48 p-2 flex items-center justify-center gap-2 relative hidden">
+        <div class="zone-title">HAND</div>
+        <div id="main-player-hand-cards" data-zone-name="hand" class="card-container w-full h-full justify-center items-center"></div>
+    </div>
+    
+    <div id="zone-viewer-modal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+        <div class="bg-gray-800 rounded-lg max-w-6xl w-full max-h-full overflow-y-auto p-6 relative shadow-2xl border border-indigo-500">
+            <h2 id="zone-viewer-title" class="text-2xl font-bold mb-4 text-indigo-300">Zone</h2>
+            <button id="zone-viewer-close" class="absolute top-4 right-4 text-3xl font-light text-gray-400 hover:text-white leading-none">&times;</button>
+            <div id="zone-viewer-content" data-zone-name="" class="card-container min-h-[150px] justify-center">
+            </div>
+        </div>
+    </div>
+    
+    <div id="context-menu" class="context-menu hidden"></div>
+    
+    <div id="deck-selection-modal" class="hidden fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
+         <div class="bg-gray-800 rounded-lg max-w-md w-full p-6 shadow-2xl border border-indigo-500">
+            <h2 class="text-2xl font-bold mb-4 text-indigo-300">Select Your Deck</h2>
+            <p class="text-gray-400 mb-6">Choose one of your saved decks to join the game.</p>
+            <div id="deck-selection-list" class="space-y-2">
+            </div>
+        </div>
+    </div>
+
+    <div id="token-creator-modal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+        <div class="bg-gray-800 rounded-lg max-w-md w-full p-6 shadow-2xl border border-indigo-500">
+            <h2 class="text-2xl font-bold mb-4 text-indigo-300">Create Token</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-400">Common Tokens</label>
+                    <select id="common-token-select" class="w-full mt-1 context-menu-input">
+                        <option value="">-- Select a common token --</option>
+                        <option value="Treasure">Treasure (Artifact)</option>
+                        <option value="Food">Food (Artifact)</option>
+                        <option value="Clue">Clue (Artifact)</option>
+                        <option value="1/1 Human">1/1 Human (White)</option>
+                        <option value="1/1 Goblin">1/1 Goblin (Red)</option>
+                        <option value="1/1 Elf Warrior">1/1 Elf Warrior (Green)</option>
+                        <option value="2/2 Zombie">2/2 Zombie (Black)</option>
+                    </select>
+                </div>
+                <div class="context-menu-divider">OR</div>
+                 <div>
+                    <label class="block text-sm font-medium text-gray-400">Custom Token</label>
+                    <input type="text" id="token-name" placeholder="Token Name" class="w-full mt-1 context-menu-input">
+                </div>
+                 <div>
+                    <input type="text" id="token-pt" placeholder="P/T (e.g., 2/2)" class="w-full mt-1 context-menu-input">
+                </div>
+                 <div>
+                    <textarea id="token-text" placeholder="Abilities..." rows="2" class="w-full mt-1 context-menu-input"></textarea>
+                </div>
+                <div class="flex gap-4">
+                     <button id="token-creator-cancel" class="w-full bg-gray-600 text-white py-2 rounded">Cancel</button>
+                     <button id="token-creator-create" class="w-full bg-indigo-600 text-white py-2 rounded">Create</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            let gameState = {};
+            let myPlayerId = null; 
+            let myUserId = null;   
+            let gameId = null;
+            let gameRef = null;
+            let sortableInstances = [];
+            let modalSortable = null;
+            let contextMenuCard = null;
+            let longPressTimer;
+            let allCardsFromDb = [];
+
+            const mainGridEl = document.querySelector('.main-grid');
+            const handAreaEl = document.getElementById('main-player-hand-area');
+            const handCardsEl = document.getElementById('main-player-hand-cards');
+            const gameIdDisplayEl = document.getElementById('gameIdDisplay');
+            const zoneViewerModal = document.getElementById('zone-viewer-modal');
+            const zoneViewerTitle = document.getElementById('zone-viewer-title');
+            const zoneViewerContent = document.getElementById('zone-viewer-content');
+            const zoneViewerClose = document.getElementById('zone-viewer-close');
+            const contextMenu = document.getElementById('context-menu');
+            const deckSelectionModal = document.getElementById('deck-selection-modal');
+            const deckSelectionList = document.getElementById('deck-selection-list');
+            const tokenCreatorModal = document.getElementById('token-creator-modal');
+
+            const encodeFirebaseKey = (str) => str.replace(/\//g, '__slash__');
+            const decodeFirebaseKey = (str) => str.replace(/__slash__/g, '/');
+
+            function shuffle(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+            }
+
+            function getPlayerOrder(players) {
+                const playerIds = Object.keys(players).sort(); 
+                const myIndex = playerIds.indexOf(myPlayerId);
+                if (myIndex === -1) return playerIds; 
+                return [...playerIds.slice(myIndex), ...playerIds.slice(0, myIndex)];
+            }
+            
+            function createCardElement(card) {
+                const el = document.createElement('div');
+                el.dataset.instanceId = card.instanceId;
+                el.className = 'card';
+                
+                if (card.isToken) {
+                    el.classList.add('token');
+                    el.innerHTML = `
+                        <div class="token-name">${card.name}</div>
+                        <div class="text-xs">${card.text || ''}</div>
+                        <div class="token-pt">${card.pt || ''}</div>
+                    `;
+                } else {
+                    el.style.backgroundImage = `url(${card.imageUrl})`;
+                }
+
+                if (card.tapped) el.classList.add('tapped');
+                
+                const badgeContainer = document.createElement('div');
+                badgeContainer.className = 'counter-badge-container';
+                el.appendChild(badgeContainer);
+                
+                if (card.counters) {
+                    Object.entries(card.counters).forEach(([name, count]) => {
+                        if (count > 0) {
+                            const decodedName = decodeFirebaseKey(name);
+                            const badge = document.createElement('div');
+                            badge.className = 'counter-badge';
+                            badge.textContent = `${decodedName} (${count})`;
+                            badgeContainer.appendChild(badge);
+                        }
+                    });
+                }
+                return el;
+            }
+
+            function updateCardContainer(containerEl, newCards = []) {
+                const existingCardElements = new Map();
+                containerEl.querySelectorAll('.card').forEach(el => {
+                    existingCardElements.set(el.dataset.instanceId, el);
+                });
+
+                const newCardIds = new Set(newCards.map(c => c && c.instanceId));
+
+                existingCardElements.forEach((el, instanceId) => {
+                    if (!newCardIds.has(instanceId)) {
+                        containerEl.removeChild(el);
+                    }
+                });
+
+                newCards.forEach((cardData, index) => {
+                    if (!cardData) return;
+                    let cardEl = existingCardElements.get(cardData.instanceId);
+                    if (!cardEl) {
+                        cardEl = createCardElement(cardData);
+                    } else {
+                        cardEl.classList.toggle('tapped', !!cardData.tapped);
+                        const badgeContainer = cardEl.querySelector('.counter-badge-container');
+                        badgeContainer.innerHTML = ''; 
+                        if (cardData.counters) {
+                            Object.entries(cardData.counters).forEach(([name, count]) => {
+                                if(count > 0) {
+                                    const decodedName = decodeFirebaseKey(name);
+                                    const badge = document.createElement('div');
+                                    badge.className = 'counter-badge';
+                                    badge.textContent = `${decodedName} (${count})`;
+                                    badgeContainer.appendChild(badge);
+                                }
+                            });
+                        }
+                    }
+                    
+                    if (containerEl.children[index] !== cardEl) {
+                        containerEl.insertBefore(cardEl, containerEl.children[index]);
+                    }
+                });
+            }
+
+            function renderBoard() {
+                if (!gameState || !gameState.players || !myPlayerId) return;
+
+                const myPlayerState = gameState.players[myPlayerId];
+                if (myPlayerId !== 'p1' && !myPlayerState.shuffled) {
+                    showDeckSelectionModal();
+                    return;
+                }
+                deckSelectionModal.classList.add('hidden');
+
+                const orderedPlayerIds = getPlayerOrder(gameState.players);
+                const playerCount = orderedPlayerIds.length;
+                const boardPlayerCount = mainGridEl.querySelectorAll('.player-area').length;
+                
+                if (playerCount !== boardPlayerCount) {
+                    setupBoardHTML(orderedPlayerIds);
+                }
+
+                orderedPlayerIds.forEach(playerId => {
+                    const playerState = gameState.players[playerId];
+                    if (!playerState) return;
+                    
+                    const battlefieldEl = document.getElementById(`${playerId}-battlefield-cards`);
+                    if (battlefieldEl) {
+                        updateCardContainer(battlefieldEl, playerState.battlefield || []);
+                    }
+                    
+                    document.getElementById(`${playerId}-graveyard`).querySelector('.zone-title').textContent = `GRAVEYARD (${(playerState.graveyard || []).length})`;
+                    document.getElementById(`${playerId}-exile`).querySelector('.zone-title').textContent = `EXILE (${(playerState.exile || []).length})`;
+                    document.getElementById(`${playerId}-commander`).querySelector('.zone-title').textContent = `COMMANDER (${(playerState.commander || []).length})`;
+                    document.getElementById(`${playerId}-library`).querySelector('.zone-title').textContent = `LIBRARY (${(playerState.deck || []).length})`;
+                    document.getElementById(`${playerId}-life-total`).value = playerState.life ?? 40;
+
+                    // FIX APPLIED HERE:
+                    // Forcefully removes any card elements from the side zones on every render to prevent visual bugs from drag-and-drop.
+                    document.querySelectorAll(`#${playerId}-graveyard .card, #${playerId}-exile .card, #${playerId}-commander .card`).forEach(c => c.remove());
+                });
+
+                if (myPlayerState) {
+                    handAreaEl.classList.remove('hidden');
+                    updateCardContainer(handCardsEl, myPlayerState.hand || []);
+                    handAreaEl.querySelector('.zone-title').textContent = `HAND (${(myPlayerState.hand || []).length})`;
+                }
+                
+                initializeDragAndDrop();
+                addClickListenersToMyCards();
+            }
+
+            function setupBoardHTML(orderedPlayerIds) {
+                 const playerCount = orderedPlayerIds.length;
+                let gridWrapperClass = 'w-full h-full grid gap-2';
+                if (playerCount <= 2) {
+                    gridWrapperClass += ' grid-rows-2';
+                } else {
+                    gridWrapperClass += ' grid-cols-2 grid-rows-2';
+                }
+                const screenPositions = {
+                    1: ['row-start-2 col-span-2'],
+                    2: ['row-start-2', 'row-start-1'],
+                    3: ['row-start-2 col-span-2', 'row-start-1 col-start-1', 'row-start-1 col-start-2'],
+                    4: ['row-start-2 col-start-1', 'row-start-1 col-start-1', 'row-start-1 col-start-2', 'row-start-2 col-start-2']
+                };
+                const positionsToUse = screenPositions[playerCount] || [];
+                
+                let boardHTML = `<div class="${gridWrapperClass}">`;
+                orderedPlayerIds.forEach((playerId, index) => {
+                    const isMe = playerId === myPlayerId;
+                    boardHTML += `
+                        <div id="player-area-${playerId}" class="player-area bg-gray-900/80 rounded-lg p-2 flex gap-2 overflow-hidden ${positionsToUse[index] || ''} ${isMe ? 'my-player-area' : ''}">
+                            <div class="flex-shrink-0 w-24 md:w-32 lg:w-40 flex flex-col gap-2">
+                                <div id="${playerId}-commander" class="game-zone h-1/4 clickable-zone"><div class="zone-title">COMMANDER (0)</div><div data-zone-name="commander" class="card-container"></div></div>
+                                <div id="${playerId}-library" class="game-zone h-1/4 ${isMe ? 'clickable-zone' : ''}"><div class="zone-title">LIBRARY (0)</div><div data-zone-name="library" class="card-container"></div></div>
+                                <div id="${playerId}-graveyard" class="game-zone h-1/4 clickable-zone"><div class="zone-title">GRAVEYARD (0)</div><div data-zone-name="graveyard" class="card-container"></div></div>
+                                <div id="${playerId}-exile" class="game-zone h-1/4 clickable-zone"><div class="zone-title">EXILE (0)</div><div data-zone-name="exile" class="card-container"></div></div>
+                            </div>
+                            <div id="${playerId}-battlefield-wrapper" class="game-zone flex-grow">
+                                <div class="zone-title">BATTLEFIELD</div>
+                                <div id="${playerId}-battlefield-cards" data-zone-name="battlefield" class="card-container"></div>
+                            </div>
+                            <div class="flex-shrink-0 w-24 md:w-32 flex flex-col items-center justify-center bg-gray-800/80 rounded-lg p-2">
+                                ${isMe ? '<button id="create-token-btn" class="w-full mb-2 bg-indigo-600 text-white text-xs py-1 rounded">Create Token</button>' : ''}
+                                <span class="font-bold text-gray-400 text-xs md:text-sm">${isMe ? 'YOU' : 'OPPONENT'}</span>
+                                <input type="number" id="${playerId}-life-total" class="life-total-input text-4xl lg:text-5xl font-bold" value="40" ${isMe ? '' : 'readonly'}>
+                                <div class="flex gap-1 md:gap-2 mt-2">
+                                    <button data-player-id="${playerId}" data-action="decrement" class="bg-red-600 w-8 h-8 md:w-10 md:h-10 text-xl md:text-2xl rounded-full">-</button>
+                                    <button data-player-id="${playerId}" data-action="increment" class="bg-green-600 w-8 h-8 md:w-10 md:h-10 text-xl md:text-2xl rounded-full">+</button>
+                                </div>
+                            </div>
+                        </div>`;
+                });
+                boardHTML += `</div>`;
+                mainGridEl.innerHTML = boardHTML;
+                
+                document.querySelectorAll('.clickable-zone').forEach(el => {
+                    const playerId = el.id.split('-')[0];
+                    const zoneName = el.id.split('-')[1];
+                    if (zoneName === 'library' && playerId === myPlayerId) {
+                        el.addEventListener('click', drawCard);
+                    } else { 
+                        el.addEventListener('click', () => openZoneViewer(playerId, zoneName));
+                    }
+                });
+                 const createTokenBtn = document.getElementById('create-token-btn');
+                if(createTokenBtn) {
+                    createTokenBtn.addEventListener('click', () => tokenCreatorModal.classList.remove('hidden'));
+                }
+            }
+
+            function drawCard() {
+                const playerRef = gameRef.child('players').child(myPlayerId);
+                playerRef.transaction(playerState => {
+                    if (playerState && playerState.deck && playerState.deck.length > 0) {
+                        const cardToDraw = playerState.deck.pop();
+                        cardToDraw.instanceId = `card-${Date.now()}-${Math.random()}`;
+                        if (!playerState.hand) playerState.hand = [];
+                        playerState.hand.push(cardToDraw);
+                    }
+                    return playerState;
+                });
+            }
+
+            function initializeDragAndDrop() {
+                sortableInstances.forEach(s => s.destroy());
+                sortableInstances = [];
+                if (!myPlayerId) return;
+                
+                const myContainers = document.querySelectorAll(
+                    `#player-area-${myPlayerId} .card-container, #main-player-hand-cards`
+                );
+
+                myContainers.forEach(containerEl => {
+                    if (!containerEl) return;
+                    const options = {
+                        group: 'cards',
+                        animation: 150,
+                        ghostClass: 'sortable-ghost',
+                        dragClass: 'sortable-drag',
+                        onStart: () => document.body.style.cursor = 'grabbing',
+                        onEnd: (event) => {
+                            document.body.style.cursor = '';
+                            handleCardMove(event);
+                        }
+                    };
+                    sortableInstances.push(new Sortable(containerEl, options));
+                });
+            }
+            
+            function handleCardClick(event) {
+                if (event.metaKey || event.ctrlKey) return; 
+                const cardEl = event.currentTarget;
+                const instanceId = cardEl.dataset.instanceId;
+                const playerRef = gameRef.child('players').child(myPlayerId);
+
+                playerRef.transaction(playerState => {
+                    if (playerState && playerState.battlefield) {
+                        const cardIndex = playerState.battlefield.findIndex(c => c && c.instanceId === instanceId);
+                        if (cardIndex > -1) {
+                            playerState.battlefield[cardIndex].tapped = !playerState.battlefield[cardIndex].tapped;
+                        }
+                    }
+                    return playerState;
+                });
+            }
+            
+            function showContextMenu(event) {
+                event.preventDefault();
+                hideContextMenu();
+                
+                const cardEl = event.currentTarget;
+                const instanceId = cardEl.dataset.instanceId;
+                const parentZoneEl = cardEl.closest('[data-zone-name]');
+                const parentZoneName = parentZoneEl ? parentZoneEl.dataset.zoneName : null;
+                
+                contextMenuCard = { instanceId, fromZone: parentZoneName };
+                
+                let menuHTML = '';
+                
+                if (parentZoneName === 'battlefield') {
+                    const cardData = gameState.players[myPlayerId]?.battlefield.find(c => c.instanceId === instanceId);
+                    if (cardData && cardData.counters && Object.keys(cardData.counters).length > 0) {
+                        Object.entries(cardData.counters).forEach(([name, count]) => {
+                            const decodedName = decodeFirebaseKey(name);
+                            menuHTML += `
+                                <div class="context-menu-item">
+                                    <span class="mr-2 truncate">${decodedName} (${count})</span>
+                                    <div class="flex items-center gap-2">
+                                        <button data-action="change-counter" data-name="${name}" data-amount="-1" class="flex items-center justify-center bg-gray-600 w-6 h-6 rounded-full">-</button>
+                                        <button data-action="change-counter" data-name="${name}" data-amount="1" class="flex items-center justify-center bg-gray-600 w-6 h-6 rounded-full">+</button>
+                                    </div>
+                                </div>`;
+                        });
+                    } else {
+                        menuHTML += `<div class="p-2 text-sm text-gray-400 text-center">No counters</div>`;
+                    }
+                    menuHTML += `<div class="context-menu-divider"></div>
+                                 <div class="p-1">
+                                     <input type="text" id="new-counter-name" placeholder="New counter..." class="context-menu-input mb-2">
+                                     <button data-action="add-counter" class="w-full bg-indigo-600 text-white text-sm py-1 rounded">Add</button>
+                                 </div>`;
+                } else {
+                    menuHTML += '<div>';
+                    const targetZones = ['Hand', 'Battlefield', 'Graveyard', 'Exile', 'Commander', 'Library (Top)', 'Library (Bottom)'];
+                    targetZones.forEach(zone => {
+                        const zoneId = zone.toLowerCase().replace(' (top)','-top').replace(' (bottom)','-bottom');
+                        menuHTML += `<button class="context-menu-button" data-action="move-to" data-zone="${zoneId}">${zone}</button>`;
+                    });
+                    menuHTML += '</div>';
+                }
+                
+                contextMenu.innerHTML = menuHTML;
+                contextMenu.style.left = `${event.clientX}px`;
+                contextMenu.style.top = `${event.clientY}px`;
+                contextMenu.classList.remove('hidden');
+            }
+
+            function hideContextMenu() {
+                contextMenu.classList.add('hidden');
+                contextMenuCard = null;
+            }
+
+            function handleContextMenuClick(event) {
+                 const button = event.target.closest('button[data-action]');
+                if (!button) return;
+
+                const action = button.dataset.action;
+
+                if (action === 'change-counter') {
+                    const name = button.dataset.name;
+                    const amount = parseInt(button.dataset.amount, 10);
+                    changeCounter(name, amount);
+                } else if (action === 'add-counter') {
+                    const counterName = document.getElementById('new-counter-name').value.trim();
+                    if (counterName) {
+                        addNewCounter(counterName);
+                    }
+                } else if (action === 'move-to') {
+                    const toZone = button.dataset.zone;
+                    moveCardToZone(toZone);
+                }
+            }
+
+            function changeCounter(encodedCounterName, amount) {
+                if (!contextMenuCard) return;
+                const playerRef = gameRef.child('players').child(myPlayerId);
+                playerRef.transaction(playerState => {
+                    if (playerState && playerState.battlefield) {
+                        const card = playerState.battlefield.find(c => c && c.instanceId === contextMenuCard.instanceId);
+                        if (card) {
+                            if (!card.counters) card.counters = {};
+                            if (!card.counters[encodedCounterName]) card.counters[encodedCounterName] = 0;
+                            card.counters[encodedCounterName] += amount;
+                            if (card.counters[encodedCounterName] <= 0) {
+                                delete card.counters[encodedCounterName];
+                            }
+                        }
+                    }
+                    return playerState;
+                });
+                hideContextMenu();
+            }
+
+            function addNewCounter(counterName) {
+                if (!contextMenuCard) return;
+                const encodedName = encodeFirebaseKey(counterName);
+                const playerRef = gameRef.child('players').child(myPlayerId);
+                playerRef.transaction(playerState => {
+                    if (playerState && playerState.battlefield) {
+                        const card = playerState.battlefield.find(c => c.instanceId === contextMenuCard.instanceId);
+                        if (card) {
+                            if (!card.counters) card.counters = {};
+                            card.counters[encodedName] = (card.counters[encodedName] || 0) + 1;
+                        }
+                    }
+                    return playerState;
+                });
+                hideContextMenu();
+            }
+            
+            function moveCardToZone(toZoneId) {
+                if (!contextMenuCard) return;
+                const { instanceId, fromZone } = contextMenuCard;
+                
+                const isLibraryMove = toZoneId.includes('library');
+                const toZone = isLibraryMove ? 'deck' : toZoneId.replace('-top','').replace('-bottom','');
+
+                const playerRef = gameRef.child('players').child(myPlayerId);
+                playerRef.transaction(playerState => {
+                    if (!playerState || !playerState[fromZone]) return playerState;
+
+                    const cardIndex = playerState[fromZone].findIndex(c => c && c.instanceId === instanceId);
+                    if (cardIndex > -1) {
+                        const [cardToMove] = playerState[fromZone].splice(cardIndex, 1);
+                        
+                        if (toZone !== 'battlefield') {
+                           delete cardToMove.tapped;
+                           delete cardToMove.counters;
+                        }
+
+                        if (!playerState[toZone]) playerState[toZone] = [];
+                        
+                        if (isLibraryMove) {
+                           if (toZoneId.endsWith('-top')) {
+                                playerState[toZone].push(cardToMove);
+                           } else {
+                                playerState[toZone].unshift(cardToMove);
+                           }
+                        } else {
+                            playerState[toZone].push(cardToMove);
+                        }
+                    }
+                    return playerState;
+                });
+
+                hideContextMenu();
+                closeZoneViewer();
+            }
+
+            function addClickListenersToMyCards() {
+                 document.querySelectorAll(`#player-area-${myPlayerId} .card, #zone-viewer-modal .card`).forEach(cardEl => {
+                    cardEl.removeEventListener('click', handleCardClick);
+                    cardEl.removeEventListener('contextmenu', showContextMenu);
+                    cardEl.removeEventListener('touchstart', handleTouchStart);
+                    cardEl.removeEventListener('touchend', handleTouchEnd);
+                    cardEl.removeEventListener('touchmove', handleTouchMove);
+
+                    cardEl.addEventListener('click', handleCardClick);
+                    cardEl.addEventListener('contextmenu', showContextMenu);
+                    cardEl.addEventListener('touchstart', handleTouchStart);
+                    cardEl.addEventListener('touchend', handleTouchEnd);
+                    cardEl.addEventListener('touchmove', handleTouchMove);
+                });
+            }
+
+            function handleTouchStart(e) {
+                longPressTimer = setTimeout(() => {
+                    e.preventDefault();
+                    showContextMenu({ clientX: e.touches[0].clientX, clientY: e.touches[0].clientY, currentTarget: e.currentTarget, preventDefault: () => {} });
+                }, 500);
+            }
+            function handleTouchEnd() { clearTimeout(longPressTimer); }
+            function handleTouchMove() { clearTimeout(longPressTimer); }
+            
+            function handleCardMove(event) {
+                const cardEl = event.item;
+                const instanceId = cardEl.dataset.instanceId;
+                if (!instanceId) return;
+
+                const fromEl = event.from;
+                const toEl = event.to;
+
+                const fromKey = fromEl.closest('[data-zone-name]').dataset.zoneName;
+                const toKey = toEl.closest('[data-zone-name]').dataset.zoneName;
+                
+                if (!fromKey || !toKey) {
+                    console.error("Could not determine from/to zone for card move.", { fromEl, toEl });
+                    return;
+                }
+                
+                const playerRef = gameRef.child('players').child(myPlayerId);
+                playerRef.transaction(playerState => {
+                    if (!playerState) return playerState;
+
+                    let cardToMove = null;
+                    const potentialZones = ['hand', 'battlefield', 'graveyard', 'exile', 'commander', 'deck'];
+                    
+                    for (const zoneKey of potentialZones) {
+                         const actualZoneKey = zoneKey === 'library' ? 'deck' : zoneKey;
+                        if (playerState[actualZoneKey]) {
+                            const cardIndex = playerState[actualZoneKey].findIndex(c => c && c.instanceId === instanceId);
+                            if (cardIndex > -1) {
+                                [cardToMove] = playerState[actualZoneKey].splice(cardIndex, 1);
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (cardToMove) {
+                        const actualToKey = toKey === 'library' ? 'deck' : toKey;
+                        if (!playerState[actualToKey]) playerState[actualToKey] = [];
+                        
+                        if (actualToKey !== 'battlefield') {
+                            delete cardToMove.tapped;
+                            delete cardToMove.counters;
+                        }
+                        
+                        playerState[actualToKey].splice(event.newIndex, 0, cardToMove);
+                    } 
+                    return playerState;
+                });
+            }
+
+            function handleLifeChange(playerId, action) {
+                 const playerLifeRef = gameRef.child('players').child(playerId).child('life');
+                playerRef.transaction(currentLife => {
+                    if (currentLife === null) currentLife = 40;
+                    if (action === 'increment' && currentLife < 999) return currentLife + 1;
+                    if (action === 'decrement' && currentLife > 0) return currentLife - 1;
+                    return currentLife; 
+                });
+            }
+
+            function handleLifeTextEntry(event) {
+                const lifeEl = event.target;
+                let newLife = parseInt(lifeEl.value, 10);
+                if (isNaN(newLife)) {
+                    lifeEl.value = gameState.players[myPlayerId]?.life ?? 40; 
+                    return;
+                }
+                newLife = Math.max(0, Math.min(newLife, 999));
+                gameRef.child('players').child(myPlayerId).child('life').set(newLife);
+            }
+            
+            function openZoneViewer(playerId, zoneName) {
+                 if (modalSortable) modalSortable.destroy();
+
+                const playerState = gameState.players[playerId];
+                if (!playerState) return;
+                
+                const actualZoneName = zoneName === 'library' ? 'deck' : zoneName;
+                const cards = playerState[actualZoneName] || [];
+
+                const ownerName = playerId === myPlayerId ? 'Your' : `${playerId}'s`;
+                zoneViewerTitle.textContent = `${ownerName} ${zoneName.charAt(0).toUpperCase() + zoneName.slice(1)}`;
+                zoneViewerContent.innerHTML = '';
+                zoneViewerContent.dataset.zoneName = zoneName;
+                
+                if (cards.length === 0) {
+                    zoneViewerContent.innerHTML = '<p class="text-gray-500">This zone is empty.</p>';
+                } else {
+                    cards.slice().reverse().forEach(card => {
+                         const cardEl = createCardElement(card);
+                         zoneViewerContent.appendChild(cardEl);
+                    });
+                }
+                
+                zoneViewerModal.classList.remove('hidden');
+                
+                addClickListenersToMyCards(); 
+
+                if (playerId === myPlayerId) {
+                    modalSortable = new Sortable(zoneViewerContent, {
+                        group: 'cards',
+                        animation: 150,
+                        ghostClass: 'sortable-ghost',
+                        dragClass: 'sortable-drag',
+                        onStart: () => document.body.style.cursor = 'grabbing',
+                        onEnd: (event) => {
+                            document.body.style.cursor = '';
+                            handleCardMove(event);
+                        }
+                    });
+                }
+            }
+
+            function closeZoneViewer() {
+                if (modalSortable) modalSortable.destroy();
+                modalSortable = null;
+                zoneViewerModal.classList.add('hidden');
+            }
+            
+            function showDeckSelectionModal() {
+                const savedDecks = JSON.parse(localStorage.getItem('savedDecks')) || {};
+                deckSelectionList.innerHTML = '';
+
+                if (Object.keys(savedDecks).length === 0) {
+                    deckSelectionList.innerHTML = '<p class="text-gray-400">No saved decks found. Please create a deck in the deckbuilder.</p>';
+                } else {
+                    for (const deckName in savedDecks) {
+                        const button = document.createElement('button');
+                        button.className = 'deck-select-button';
+                        button.textContent = deckName;
+                        button.addEventListener('click', () => {
+                            const deckIds = savedDecks[deckName];
+                            const fullDeck = deckIds.map(id => allCardsFromDb.find(card => card.id === id)).filter(Boolean);
+                            loadDeckForPlayer(fullDeck);
+                        });
+                        deckSelectionList.appendChild(button);
+                    }
+                }
+                deckSelectionModal.classList.remove('hidden');
+            }
+
+            function loadDeckForPlayer(deck) {
+                if (!myPlayerId || !deck || deck.length === 0) return;
+                shuffle(deck);
+                gameRef.child('players').child(myPlayerId).update({
+                    deck: deck,
+                    shuffled: true
+                });
+                deckSelectionModal.classList.add('hidden');
+            }
+            
+            function createToken(tokenData) {
+                const playerRef = gameRef.child('players').child(myPlayerId);
+                playerRef.transaction(playerState => {
+                    if (playerState) {
+                        if (!playerState.battlefield) playerState.battlefield = [];
+                        
+                        const newToken = {
+                            ...tokenData,
+                            isToken: true,
+                            instanceId: `token-${Date.now()}-${Math.random()}`
+                        };
+                        playerState.battlefield.push(newToken);
+                    }
+                    return playerState;
+                });
+                tokenCreatorModal.classList.add('hidden');
+            }
+
+            async function initializeGame() {
+                contextMenu.addEventListener('click', handleContextMenuClick);
+                
+                window.addEventListener('click', (e) => {
+                    if (!contextMenu.contains(e.target) && !e.target.closest('.card')) {
+                         hideContextMenu();
+                    }
+                });
+                window.addEventListener('contextmenu', (e) => {
+                     if (!e.target.closest('.card')) hideContextMenu();
+                });
+
+                mainGridEl.addEventListener('click', (event) => {
+                    const button = event.target.closest('button[data-player-id]');
+                    if (button && button.dataset.playerId === myPlayerId) {
+                        handleLifeChange(button.dataset.playerId, button.dataset.action);
+                    }
+                });
+                mainGridEl.addEventListener('change', (event) => {
+                    if (event.target.id === `${myPlayerId}-life-total`) {
+                        handleLifeTextEntry(event);
+                    }
+                });
+                
+                zoneViewerClose.addEventListener('click', closeZoneViewer);
+                zoneViewerModal.addEventListener('click', (e) => {
+                    if (e.target === zoneViewerModal) closeZoneViewer();
+                });
+
+                const tokenCreateBtn = document.getElementById('token-creator-create');
+                const tokenCancelBtn = document.getElementById('token-creator-cancel');
+                const commonTokenSelect = document.getElementById('common-token-select');
+
+                tokenCancelBtn.addEventListener('click', () => tokenCreatorModal.classList.add('hidden'));
+
+                tokenCreateBtn.addEventListener('click', () => {
+                    const name = document.getElementById('token-name').value;
+                    const pt = document.getElementById('token-pt').value;
+                    const text = document.getElementById('token-text').value;
+                    if(name) { // Only create if a name is provided
+                        createToken({ name, pt, text });
+                        document.getElementById('token-name').value = '';
+                        document.getElementById('token-pt').value = '';
+                        document.getElementById('token-text').value = '';
+                    }
+                });
+
+                commonTokenSelect.addEventListener('change', (e) => {
+                    const selected = e.target.value;
+                    if(!selected) return;
+                    let tokenData = {};
+                    switch(selected) {
+                        case 'Treasure':
+                            tokenData = { name: 'Treasure', text: '{T}, Sacrifice this artifact: Add one mana of any color.'};
+                            break;
+                        case 'Food':
+                            tokenData = { name: 'Food', text: '{2}, {T}, Sacrifice this artifact: You gain 3 life.'};
+                            break;
+                        case 'Clue':
+                             tokenData = { name: 'Clue', text: '{2}, Sacrifice this artifact: Draw a card.'};
+                             break;
+                        case '1/1 Human':
+                             tokenData = { name: 'Human', pt: '1/1'};
+                             break;
+                        case '1/1 Goblin':
+                            tokenData = { name: 'Goblin', pt: '1/1'};
+                            break;
+                        case '1/1 Elf Warrior':
+                             tokenData = { name: 'Elf Warrior', pt: '1/1'};
+                             break;
+                        case '2/2 Zombie':
+                             tokenData = { name: 'Zombie', pt: '2/2'};
+                             break;
+                    }
+                    if (Object.keys(tokenData).length > 0) {
+                        createToken(tokenData);
+                    }
+                    e.target.value = ""; // Reset dropdown
+                });
+
+
+                const urlParams = new URLSearchParams(window.location.search);
+                gameId = urlParams.get('gameId');
+                gameIdDisplayEl.textContent = gameId;
+
+                if (!gameId) {
+                    document.body.innerHTML = '<h1 class="text-red-500 text-2xl p-8">Error: No game ID provided.</h1>';
+                    return;
+                }
+                gameRef = realdb.ref(`games/${gameId}`);
+
+                try {
+                    const snapshot = await db.collection('cards').get();
+                    allCardsFromDb = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                    const { user } = await firebase.auth().signInAnonymously();
+                    myUserId = user.uid;
+
+                    await gameRef.transaction(currentGameState => {
+                          if (currentGameState) {
+                            let isAlreadyInGame = false;
+                            if (currentGameState.players) {
+                                Object.entries(currentGameState.players).forEach(([pId, pData]) => {
+                                    if (pData && pData.uid === myUserId) {
+                                        isAlreadyInGame = true;
+                                        myPlayerId = pId;
+                                    }
+                                });
+                            } else {
+                                currentGameState.players = {};
+                            }
+
+                            if (!isAlreadyInGame) {
+                                const p1 = currentGameState.players.p1;
+                                if (p1 && !p1.uid) { 
+                                    myPlayerId = 'p1';
+                                    p1.uid = myUserId;
+                                } else { 
+                                    const openSlot = ['p2', 'p3', 'p4'].find(slot => !currentGameState.players[slot]);
+                                    if (openSlot) {
+                                        myPlayerId = openSlot;
+                                        currentGameState.players[openSlot] = { uid: myUserId, life: 40, deck: [], hand: [], battlefield: [], graveyard:[], exile:[], commander:[] };
+                                    }
+                                }
+                            }
+
+                            const p1 = currentGameState.players.p1;
+                             if (myPlayerId === 'p1' && p1 && p1.deck && !p1.shuffled) {
+                                const deck = p1.deck || [];
+                                shuffle(deck);
+                                p1.deck = deck;
+                                p1.shuffled = true;
+                            }
+                        }
+                        return currentGameState;
+                    });
+
+                    gameRef.on('value', (snapshot) => {
+                        const newGameState = snapshot.val();
+                        if (newGameState) {
+                            gameState = newGameState;
+                            renderBoard();
+                        }
+                    });
+                } catch (error) {
+                    console.error("Initialization failed:", error);
+                    document.body.innerHTML = '<h1 class="text-red-500 text-2xl p-8">Error: Could not connect to the server.</h1>';
+                }
+            }
+            
+            initializeGame();
+        });
+    </script>
+</body>
+</html>
