@@ -209,12 +209,27 @@
             padding: 2px 6px;
             border-radius: 4px;
         }
-        /* NEW: Styles for the card pop-out viewer */
+        /* UPDATED: Styles for the card pop-out viewer */
         #card-popout {
-            width: 250px;
-            height: 350px;
-            border: 2px solid white;
-            z-index: 10000;
+            width: 280px;
+            background-color: #1f2937;
+            border: 1px solid #4f46e5;
+            z-index: 9000; /* Lower than context menu */
+        }
+        #popout-img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            background-color: #374151;
+        }
+        #popout-cost {
+            display: flex;
+            gap: 2px;
+            align-items: center;
+        }
+        #popout-cost img {
+            width: 16px;
+            height: 16px;
         }
     </style>
 </head>
@@ -292,8 +307,19 @@
         </div>
     </div>
 
-    <!-- NEW: HTML for the card pop-out viewer -->
-    <div id="card-popout" class="hidden fixed bg-cover bg-center rounded-lg shadow-2xl pointer-events-none"></div>
+    <!-- UPDATED: HTML structure for the detailed card pop-out -->
+    <div id="card-popout" class="hidden fixed rounded-lg shadow-2xl pointer-events-none p-2 space-y-2">
+        <div class="flex justify-between items-start">
+            <span id="popout-name" class="font-bold"></span>
+            <span id="popout-cost" class="text-sm"></span>
+        </div>
+        <img id="popout-img" src="" alt="Card Image" class="rounded-md">
+        <div class="flex justify-between items-center text-sm">
+            <span id="popout-type" class="font-semibold"></span>
+            <span id="popout-pt" class="font-bold"></span>
+        </div>
+        <div id="popout-text" class="text-xs bg-gray-800 p-2 rounded-md"></div>
+    </div>
 
 
     <script>
@@ -308,7 +334,7 @@
             let contextMenuCard = null;
             let longPressTimer;
             let allCardsFromDb = [];
-            let cardDataMap = new Map(); // For quick card data lookups
+            let cardDataMap = new Map();
 
             const mainGridEl = document.querySelector('.main-grid');
             const handAreaEl = document.getElementById('main-player-hand-area');
@@ -322,7 +348,14 @@
             const deckSelectionModal = document.getElementById('deck-selection-modal');
             const deckSelectionList = document.getElementById('deck-selection-list');
             const tokenCreatorModal = document.getElementById('token-creator-modal');
-            const cardPopoutEl = document.getElementById('card-popout'); // NEW: Get pop-out element
+            
+            const cardPopoutEl = document.getElementById('card-popout');
+            const popoutNameEl = document.getElementById('popout-name');
+            const popoutCostEl = document.getElementById('popout-cost');
+            const popoutImgEl = document.getElementById('popout-img');
+            const popoutTypeEl = document.getElementById('popout-type');
+            const popoutPtEl = document.getElementById('popout-pt');
+            const popoutTextEl = document.getElementById('popout-text');
 
             const encodeFirebaseKey = (str) => str.replace(/\//g, '__slash__');
             const decodeFirebaseKey = (str) => str.replace(/__slash__/g, '/');
@@ -437,7 +470,6 @@
                     setupBoardHTML(orderedPlayerIds);
                 }
 
-                // NEW: Build a map of all cards for quick lookups (for pop-out)
                 cardDataMap.clear();
                 Object.values(gameState.players).forEach(player => {
                     const zones = ['hand', 'battlefield', 'graveyard', 'exile', 'commander', 'deck'];
@@ -782,10 +814,8 @@
                 closeZoneViewer();
             }
 
-            // NEW: Renamed function to be more descriptive
             function addCardEventListeners() {
                  document.querySelectorAll('.card').forEach(cardEl => {
-                    // Remove old listeners to prevent duplicates
                     cardEl.removeEventListener('click', handleCardClick);
                     cardEl.removeEventListener('contextmenu', showContextMenu);
                     cardEl.removeEventListener('touchstart', handleTouchStart);
@@ -795,7 +825,6 @@
                     cardEl.removeEventListener('mouseleave', handleCardMouseOut);
                     cardEl.removeEventListener('mousemove', handleCardMouseMove);
 
-                    // Add listeners for game actions (only for my cards)
                     if (cardEl.closest(`#player-area-${myPlayerId}, #main-player-hand-area, #zone-viewer-modal`)) {
                         cardEl.addEventListener('click', handleCardClick);
                         cardEl.addEventListener('contextmenu', showContextMenu);
@@ -804,7 +833,6 @@
                         cardEl.addEventListener('touchmove', handleTouchMove);
                     }
 
-                    // Add listeners for pop-out on ALL cards
                     cardEl.addEventListener('mouseenter', handleCardMouseOver);
                     cardEl.addEventListener('mouseleave', handleCardMouseOut);
                     cardEl.addEventListener('mousemove', handleCardMouseMove);
@@ -820,12 +848,36 @@
             function handleTouchEnd() { clearTimeout(longPressTimer); }
             function handleTouchMove() { clearTimeout(longPressTimer); }
 
-            // --- NEW: Card Pop-out Functions ---
+            // --- Card Pop-out Functions ---
+            // NEW: Helper function to parse mana cost into images
+            function parseManaCost(cost) {
+                if (!cost) return '';
+                const symbolRegex = /\{([^}]+)\}/g;
+                return cost.replace(symbolRegex, (match, symbol) => {
+                    const sanitizedSymbol = symbol.replace('/', ''); // For symbols like {W/P}
+                    return `<img src="https://svgs.scryfall.io/card-symbols/${sanitizedSymbol.toUpperCase()}.svg" alt="${symbol}" class="inline-block w-4 h-4">`;
+                });
+            }
+
             function handleCardMouseOver(event) {
                 const instanceId = event.currentTarget.dataset.instanceId;
                 const cardData = cardDataMap.get(instanceId);
                 if (cardData && !cardData.isToken) {
-                    cardPopoutEl.style.backgroundImage = `url(${cardData.imageUrl})`;
+                    popoutNameEl.textContent = cardData.name;
+                    popoutCostEl.innerHTML = parseManaCost(cardData.cost); // Use the new parser
+                    popoutImgEl.src = cardData.imageUrl;
+                    popoutTypeEl.textContent = cardData.type;
+                    popoutTextEl.textContent = cardData.text || '';
+                    
+                    // FIX: Check for both power and toughness before displaying
+                    if (cardData.power && cardData.toughness) {
+                        popoutPtEl.textContent = `${cardData.power}/${cardData.toughness}`;
+                    } else if (cardData.loyalty) {
+                        popoutPtEl.textContent = `Loyalty: ${cardData.loyalty}`;
+                    } else {
+                        popoutPtEl.textContent = '';
+                    }
+
                     cardPopoutEl.classList.remove('hidden');
                 }
             }
@@ -835,9 +887,26 @@
             }
 
             function handleCardMouseMove(event) {
-                // Position the pop-out slightly to the right and below the cursor
-                cardPopoutEl.style.left = `${event.clientX + 20}px`;
-                cardPopoutEl.style.top = `${event.clientY + 20}px`;
+                const popoutHeight = cardPopoutEl.offsetHeight;
+                const popoutWidth = cardPopoutEl.offsetWidth;
+                const buffer = 20;
+
+                let top = event.clientY + buffer;
+                let left = event.clientX + buffer;
+
+                if (top + popoutHeight > window.innerHeight) {
+                    top = event.clientY - popoutHeight - buffer;
+                }
+                // FIX: Add check to prevent going off the top of the screen
+                if (top < 0) {
+                    top = buffer;
+                }
+                if (left + popoutWidth > window.innerWidth) {
+                    left = event.clientX - popoutWidth - buffer;
+                }
+
+                cardPopoutEl.style.left = `${left}px`;
+                cardPopoutEl.style.top = `${top}px`;
             }
             
             function handleCardMove(event) {
