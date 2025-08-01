@@ -242,6 +242,12 @@
             color: white;
             cursor: pointer;
         }
+        #popout-lore {
+            font-style: italic;
+            border-top: 1px solid #4b5563;
+            padding-top: 8px;
+            margin-top: 8px;
+        }
     </style>
 </head>
 <body class="bg-gray-800 text-white h-screen flex flex-col">
@@ -344,6 +350,7 @@
             <span id="popout-pt" class="font-bold"></span>
         </div>
         <div id="popout-text" class="text-xs bg-gray-800 p-2 rounded-md"></div>
+        <div id="popout-lore" class="text-xs text-gray-400"></div>
     </div>
 
 
@@ -389,6 +396,7 @@
             const popoutTypeEl = document.getElementById('popout-type');
             const popoutPtEl = document.getElementById('popout-pt');
             const popoutTextEl = document.getElementById('popout-text');
+            const popoutLoreEl = document.getElementById('popout-lore');
             const librarySearchModal = document.getElementById('library-search-modal');
             const librarySearchClose = document.getElementById('library-search-close');
             const librarySearchInput = document.getElementById('library-search-input');
@@ -936,6 +944,13 @@
                     popoutImgEl.src = cardData.imageUrl;
                     popoutTypeEl.textContent = cardData.type;
                     popoutTextEl.textContent = cardData.text || '';
+                    
+                    if (cardData.lore) {
+                        popoutLoreEl.textContent = cardData.lore;
+                        popoutLoreEl.classList.remove('hidden');
+                    } else {
+                        popoutLoreEl.classList.add('hidden');
+                    }
                     
                     if (cardData.power && cardData.toughness) {
                         popoutPtEl.textContent = `${cardData.power}/${cardData.toughness}`;
