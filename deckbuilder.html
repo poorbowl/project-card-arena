@@ -171,7 +171,6 @@
 
         <p class="text-gray-400 mb-4">Assemble or load a deck, then start or join a game.</p>
         
-        <!-- UPDATED: Game Lobby Actions -->
         <div class="space-y-4">
             <button id="createGameBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg text-lg">Create New Game</button>
             <div class="relative">
@@ -584,20 +583,30 @@
         };
 
         const handleJoinGame = () => {
+            hideMessage();
             const gameId = joinGameIdInput.value.trim();
+            const playerName = document.getElementById('playerName').value.trim();
+
+            if (currentDeck.length === 0) {
+                showMessage("Please assemble or load a deck before joining.", true);
+                return;
+            }
+            if (!playerName) {
+                showMessage("Please enter your name before joining.", true);
+                return;
+            }
             if (!gameId) {
                 showMessage("Please enter a Game ID to join.", true);
                 return;
             }
-            // Save the current deck to local storage before redirecting
-            // This allows the game page to pick it up for a joining player
-            if (currentDeck.length > 0) {
-                const pendingDeck = {
-                    cardIds: currentDeck.map(c => c.id),
-                    commanderIds: commanders.map(c => c.id)
-                };
-                localStorage.setItem('pendingJoinDeck', JSON.stringify(pendingDeck));
-            }
+
+            const pendingJoinData = {
+                playerName: playerName,
+                deck: currentDeck,
+                commanders: commanders
+            };
+            localStorage.setItem('pendingJoinData', JSON.stringify(pendingJoinData));
+
             window.location.href = `game.html?gameId=${gameId}`;
         };
 

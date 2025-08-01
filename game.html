@@ -1140,7 +1140,6 @@
                     }
                 }
                 
-                // NEW: Always add the "Go to Deckbuilder" button
                 const deckbuilderLink = document.createElement('a');
                 deckbuilderLink.href = 'deckbuilder.html';
                 deckbuilderLink.className = 'mt-4 block text-center w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg';
@@ -1518,6 +1517,15 @@
                         }
                         return currentGameState;
                     });
+
+                    // NEW: Logic to handle joining with a pre-selected deck
+                    const pendingData = localStorage.getItem('pendingJoinData');
+                    if (pendingData && myPlayerId !== 'p1') {
+                        const { playerName, deck, commanders } = JSON.parse(pendingData);
+                        loadDeckForPlayer(deck, commanders, playerName);
+                        localStorage.removeItem('pendingJoinData');
+                    }
+
 
                     gameRef.on('value', (snapshot) => {
                         const newGameState = snapshot.val();
