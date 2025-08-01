@@ -349,7 +349,7 @@
             <span id="popout-type" class="font-semibold"></span>
             <span id="popout-pt" class="font-bold"></span>
         </div>
-        <div id="popout-text" class="text-xs bg-gray-800 p-2 rounded-md"></div>
+        <div id="popout-text" class="text-xs bg-gray-800 p-2 rounded-md whitespace-pre-wrap"></div>
         <div id="popout-lore" class="text-xs text-gray-400"></div>
     </div>
 
@@ -943,10 +943,11 @@
                     popoutCostEl.innerHTML = parseManaCost(cardData.cost);
                     popoutImgEl.src = cardData.imageUrl;
                     popoutTypeEl.textContent = cardData.type;
-                    popoutTextEl.textContent = cardData.text || '';
+                    // FIX: Use innerHTML and replace newlines with <br> for proper formatting
+                    popoutTextEl.innerHTML = (cardData.text || '').replace(/\n/g, '<br>');
                     
                     if (cardData.lore) {
-                        popoutLoreEl.textContent = cardData.lore;
+                        popoutLoreEl.innerHTML = (cardData.lore || '').replace(/\n/g, '<br>');
                         popoutLoreEl.classList.remove('hidden');
                     } else {
                         popoutLoreEl.classList.add('hidden');
@@ -1040,7 +1041,7 @@
             }
 
             function handleLifeChange(playerId, action) {
-                 const playerLifeRef = gameRef.child('players').child(playerId).child('life');
+                const playerLifeRef = gameRef.child('players').child(playerId).child('life');
                 playerLifeRef.transaction(currentLife => {
                     if (currentLife === null) currentLife = 40;
                     if (action === 'increment' && currentLife < 999) return currentLife + 1;
