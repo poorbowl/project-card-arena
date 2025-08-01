@@ -1041,7 +1041,7 @@
 
             function handleLifeChange(playerId, action) {
                  const playerLifeRef = gameRef.child('players').child(playerId).child('life');
-                playerRef.transaction(currentLife => {
+                playerLifeRef.transaction(currentLife => {
                     if (currentLife === null) currentLife = 40;
                     if (action === 'increment' && currentLife < 999) return currentLife + 1;
                     if (action === 'decrement' && currentLife > 0) return currentLife - 1;
