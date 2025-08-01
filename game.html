@@ -943,7 +943,6 @@
                     popoutCostEl.innerHTML = parseManaCost(cardData.cost);
                     popoutImgEl.src = cardData.imageUrl;
                     popoutTypeEl.textContent = cardData.type;
-                    // FIX: Use innerHTML and replace newlines with <br> for proper formatting
                     popoutTextEl.innerHTML = (cardData.text || '').replace(/\n/g, '<br>');
                     
                     if (cardData.lore) {
@@ -1116,7 +1115,9 @@
                 deckSelectionList.innerHTML = '';
 
                 if (Object.keys(savedDecks).length === 0) {
-                    deckSelectionList.innerHTML = '<p class="text-gray-400">No saved decks found. Please create a deck in the deckbuilder.</p>';
+                    deckSelectionList.innerHTML = `
+                        <p class="text-gray-400">No saved decks found.</p>
+                    `;
                 } else {
                     for (const deckName in savedDecks) {
                         const button = document.createElement('button');
@@ -1138,6 +1139,14 @@
                         deckSelectionList.appendChild(button);
                     }
                 }
+                
+                // NEW: Always add the "Go to Deckbuilder" button
+                const deckbuilderLink = document.createElement('a');
+                deckbuilderLink.href = 'deckbuilder.html';
+                deckbuilderLink.className = 'mt-4 block text-center w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg';
+                deckbuilderLink.textContent = 'Go to Deckbuilder';
+                deckSelectionList.appendChild(deckbuilderLink);
+
                 deckSelectionModal.classList.remove('hidden');
             }
 
