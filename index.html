@@ -19,8 +19,11 @@
         .btn-secondary {
             @apply bg-green-600 hover:bg-green-700 text-white;
         }
+        /* FIX: Made the input field styles more explicit to override browser defaults */
         .input-field {
-            @apply block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500;
+            color: white;
+            background-color: #374151; /* Corresponds to Tailwind's gray-700 */
+            @apply block w-full border border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500;
         }
     </style>
 </head>
