@@ -69,7 +69,7 @@
                             <input type="text" id="manaCost" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
                         </div>
                         <div>
-                            <label for="cardImage" class="block text-sm font-medium text-gray-400">Card Image (Optional when editing)</label>
+                            <label for="cardImage" class="block text-sm font-medium text-gray-400">Card Image (Optional)</label>
                             <input type="file" id="cardImage" accept="image/*" class="mt-1 block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700">
                         </div>
                         <div class="col-span-1 md:col-span-2">
@@ -108,6 +108,15 @@
                 <h2 class="text-xl font-semibold mb-4">Bulk Import Cards via CSV</h2>
                 <div class="space-y-6">
                     <div>
+                        <h3 class="text-lg font-medium text-indigo-400">Instructions</h3>
+                        <ul class="list-disc list-inside text-gray-400 text-sm mt-2 space-y-1">
+                            <li>**Mandatory Columns:** `Card Name`, `Card Type`</li>
+                            <li>If `Card Type` is "Creature", `Power` and `Toughness` are also mandatory.</li>
+                            <li>**Optional Columns:** `Mana Cost`, `Text Box`, `Lore`, `Image Filename`, `Commander?` (Y/N)</li>
+                            <li>If `Image Filename` is blank, a placeholder will be used.</li>
+                        </ul>
+                    </div>
+                    <div>
                         <h3 class="text-lg font-medium text-indigo-400">Step 1: Upload Images (.zip file)</h3>
                         <p class="text-gray-400 text-sm mt-1">Select a single .zip file containing all the image files referenced in your CSV.</p>
                         <input type="file" id="bulkImageUpload" accept=".zip" class="mt-2 block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700">
@@ -115,7 +124,7 @@
                     </div>
                     <div>
                         <h3 class="text-lg font-medium text-indigo-400">Step 2: Upload CSV File</h3>
-                        <p class="text-gray-400 text-sm mt-1">CSV must have a header row with fields like `Card Name`, `Image Filename`, `Commander?` (Y/N), etc.</p>
+                        <p class="text-gray-400 text-sm mt-1">CSV must have a header row with the column names listed above.</p>
                         <input type="file" id="csvFile" accept=".csv" class="mt-2 block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700">
                     </div>
                     <button id="importCsvBtn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">Import Cards from CSV</button>
@@ -394,29 +403,34 @@
             const name = document.getElementById('cardName').value.trim();
             const type = document.getElementById('cardType').value;
             const imageFile = document.getElementById('cardImage').files[0];
+            const power = document.getElementById('power').value;
+            const toughness = document.getElementById('toughness').value;
 
             if (!name || !type) {
                 showMessage('Card Name and Type are required.');
                 saveCardBtn.disabled = false;
                 return;
             }
-            if (!editingCardId && !imageFile) {
-                showMessage('An Image is required when creating a new card.');
+            if (type === 'Creature' && (!power || !toughness)) {
+                showMessage('Power and Toughness are required for Creatures.');
                 saveCardBtn.disabled = false;
                 return;
+            }
+            if (!editingCardId && !imageFile) {
+                // No longer mandatory
             }
 
             saveCardBtn.textContent = "Saving...";
             
             try {
-                let imageUrl;
+                let imageUrl = null;
                 const cardDataToSave = {
                     name, type,
                     cost: document.getElementById('manaCost').value.trim(),
                     text: document.getElementById('cardText').value.trim(),
                     lore: document.getElementById('cardLore').value.trim(),
-                    power: type === 'Creature' ? document.getElementById('power').value : null,
-                    toughness: type === 'Creature' ? document.getElementById('toughness').value : null,
+                    power: type === 'Creature' ? power : null,
+                    toughness: type === 'Creature' ? toughness : null,
                     loyalty: type === 'Planeswalker' ? document.getElementById('loyalty').value : null,
                 };
 
@@ -433,10 +447,15 @@
                     
                     const cardIndex = allCards.findIndex(c => c.id === editingCardId);
                     if(cardIndex > -1) {
+                        // Keep old image URL if a new one wasn't uploaded
+                        if (!cardDataToSave.imageUrl) {
+                            cardDataToSave.imageUrl = allCards[cardIndex].imageUrl;
+                        }
                         allCards[cardIndex] = { ...allCards[cardIndex], ...cardDataToSave };
                     }
                     showMessage(`Success: "${name}" was updated.`, false);
                 } else {
+                    cardDataToSave.imageUrl = imageUrl; // Can be null
                     const docRef = await db.collection('cards').add(cardDataToSave);
                     allCards.push({ id: docRef.id, ...cardDataToSave });
                     showMessage(`Success: "${name}" was added.`, false);
@@ -738,25 +757,29 @@
 
                     for (const row of results.data) {
                         const cardName = row['Card Name']?.trim();
+                        const cardType = row['Card Type']?.trim();
                         const imageFilename = row['Image Filename']?.trim();
 
-                        if (!cardName || !imageFilename) {
-                            errors.push(`Skipping row with missing Card Name or Image Filename.`);
+                        if (!cardName || !cardType) {
+                            errors.push(`Skipping row with missing Card Name or Card Type.`);
                             continue;
                         }
-
-                        if (!uploadedImageMap.has(imageFilename)) {
+                        if (cardType === 'Creature' && (!row['Power'] || !row['Toughness'])) {
+                            errors.push(`Skipping Creature "${cardName}" with missing Power or Toughness.`);
+                            continue;
+                        }
+                        if (imageFilename && !uploadedImageMap.has(imageFilename)) {
                             errors.push(`Image "${imageFilename}" for card "${cardName}" was not pre-uploaded. Skipping.`);
                             continue;
                         }
 
                         const cardData = {
                             name: cardName,
-                            type: row['Card Type']?.trim() || 'Creature',
+                            type: cardType,
                             cost: row['Mana Cost']?.trim() || '',
                             text: row['Text Box']?.trim() || '',
                             lore: row['Lore']?.trim() || '',
-                            imageUrl: uploadedImageMap.get(imageFilename),
+                            imageUrl: imageFilename ? uploadedImageMap.get(imageFilename) : null,
                             power: row['Power']?.trim() || null,
                             toughness: row['Toughness']?.trim() || null,
                             loyalty: row['Starting Loyalty']?.trim() || null
