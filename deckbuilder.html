@@ -76,7 +76,6 @@
                             <label for="cardText" class="block text-sm font-medium text-gray-400">Text Box</label>
                             <textarea id="cardText" rows="3" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"></textarea>
                         </div>
-                        <!-- NEW: Lore Field -->
                         <div class="col-span-1 md:col-span-2">
                             <label for="cardLore" class="block text-sm font-medium text-gray-400">Lore (Flavor Text)</label>
                             <textarea id="cardLore" rows="2" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"></textarea>
@@ -170,8 +169,21 @@
             </div>
         </div>
 
-        <p class="text-gray-400 mb-4">Assemble or load a deck, then start the game. The deck currently in the "Assemble Deck" view will be used.</p>
-        <button id="startGameBtn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg text-lg shadow-md transition-transform transform hover:scale-105">Start New Game</button>
+        <p class="text-gray-400 mb-4">Assemble or load a deck, then start or join a game.</p>
+        
+        <!-- UPDATED: Game Lobby Actions -->
+        <div class="space-y-4">
+            <button id="createGameBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg text-lg">Create New Game</button>
+            <div class="relative">
+                <div class="absolute inset-0 flex items-center" aria-hidden="true"><div class="w-full border-t border-gray-700"></div></div>
+                <div class="relative flex justify-center"><span class="bg-gray-900 px-2 text-sm text-gray-500">OR</span></div>
+            </div>
+            <div class="flex gap-4">
+                <input type="text" id="joinGameIdInput" placeholder="Enter Game ID..." class="block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                <button id="joinGameBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">Join Game</button>
+            </div>
+        </div>
+
     </div>
 
     <script>
@@ -189,7 +201,9 @@
         const cardTypeSelect = document.getElementById('cardType');
         const creatureFields = document.getElementById('creatureFields');
         const planeswalkerFields = document.getElementById('planeswalkerFields');
-        const startGameBtn = document.getElementById('startGameBtn');
+        const createGameBtn = document.getElementById('createGameBtn');
+        const joinGameBtn = document.getElementById('joinGameBtn');
+        const joinGameIdInput = document.getElementById('joinGameIdInput');
         const messageAreaEl = document.getElementById('message-area');
         const importCsvBtn = document.getElementById('importCsvBtn');
         const imageUploadProgressEl = document.getElementById('image-upload-progress');
@@ -524,7 +538,7 @@
             cardTypeSelect.dispatchEvent(new Event('change'));
         };
         
-        const handleStartGame = () => {
+        const handleCreateGame = () => {
             hideMessage();
             const playerName = document.getElementById('playerName').value.trim();
             const startingLife = parseInt(document.getElementById('gameMode').value, 10);
@@ -567,6 +581,24 @@
                 console.error("Could not create game session: ", error);
                 showMessage("Error starting game. Could not connect to the server.");
             });
+        };
+
+        const handleJoinGame = () => {
+            const gameId = joinGameIdInput.value.trim();
+            if (!gameId) {
+                showMessage("Please enter a Game ID to join.", true);
+                return;
+            }
+            // Save the current deck to local storage before redirecting
+            // This allows the game page to pick it up for a joining player
+            if (currentDeck.length > 0) {
+                const pendingDeck = {
+                    cardIds: currentDeck.map(c => c.id),
+                    commanderIds: commanders.map(c => c.id)
+                };
+                localStorage.setItem('pendingJoinDeck', JSON.stringify(pendingDeck));
+            }
+            window.location.href = `game.html?gameId=${gameId}`;
         };
 
         // --- Deck Management ---
@@ -756,7 +788,8 @@
                 saveCardBtn.addEventListener('click', handleSaveCard);
                 cancelEditBtn.addEventListener('click', resetForm);
                 saveDeckBtn.addEventListener('click', handleSaveDeck);
-                startGameBtn.addEventListener('click', handleStartGame);
+                createGameBtn.addEventListener('click', handleCreateGame);
+                joinGameBtn.addEventListener('click', handleJoinGame);
                 importCsvBtn.addEventListener('click', handleCsvImport);
                 document.getElementById('bulkImageUpload').addEventListener('change', handleImageUpload);
                 
