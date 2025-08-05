@@ -267,13 +267,6 @@
             padding-top: 8px;
             margin-top: 8px;
         }
-        #game-info-bar {
-            position: absolute;
-            top: 8px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 20;
-        }
         
         /* NEW CHAT STYLES */
         #chat-toggle-button {
@@ -347,11 +340,6 @@
     <div class="absolute top-2 left-2 bg-black/50 p-2 rounded-lg text-xs z-20 flex items-center gap-4">
         <div>Game ID: <span id="gameIdDisplay"></span></div>
         <button id="leaveGameBtn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded-lg">Leave Game</button>
-    </div>
-
-    <div id="game-info-bar" class="bg-black/50 p-2 rounded-lg text-center">
-        <div id="turn-indicator" class="font-bold text-lg mb-2">Waiting for players...</div>
-        <button id="passTurnBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-600 disabled:cursor-not-allowed">Pass Turn</button>
     </div>
 
     <main class="main-grid flex-grow p-2">
@@ -524,8 +512,6 @@
             const librarySearchContent = document.getElementById('library-search-content');
             const finishInteractiveBtn = document.getElementById('finish-interactive-btn');
             const leaveGameBtn = document.getElementById('leaveGameBtn');
-            const turnIndicatorEl = document.getElementById('turn-indicator');
-            const passTurnBtn = document.getElementById('passTurnBtn');
             
             // CHAT ELEMENT REFERENCES
             const chatContainer = document.getElementById('chat-container');
@@ -664,10 +650,16 @@
 
                 const currentPlayerId = gameState.turnOrder[gameState.currentPlayerIndex];
                 const currentPlayer = gameState.players[currentPlayerId];
-                if (currentPlayer) {
+                
+                const turnIndicatorEl = document.getElementById('turn-indicator');
+                const passTurnBtn = document.getElementById('passTurnBtn');
+
+                if (currentPlayer && turnIndicatorEl) {
                     turnIndicatorEl.textContent = `${currentPlayer.name}'s Turn`;
                 }
-                passTurnBtn.disabled = currentPlayerId !== myPlayerId;
+                if (passTurnBtn) {
+                    passTurnBtn.disabled = currentPlayerId !== myPlayerId;
+                }
 
                 document.querySelectorAll('.player-area').forEach(el => el.classList.remove('active-player-turn'));
                 if (currentPlayerId) {
@@ -744,7 +736,13 @@
                                 <div id="${playerId}-battlefield-cards" data-zone-name="battlefield" class="card-container"></div>
                             </div>
                             <div class="flex-shrink-0 w-24 md:w-32 flex flex-col items-center justify-center bg-gray-800/80 rounded-lg p-2">
-                                ${isMe ? '<button id="create-token-btn" class="w-full mb-2 bg-indigo-600 text-white text-xs py-1 rounded">Create Token</button>' : ''}
+                                ${isMe ? `
+                                    <div class="w-full mb-2 text-center">
+                                        <div id="turn-indicator" class="font-bold text-sm mb-1"></div>
+                                        <button id="passTurnBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs py-1 rounded-lg disabled:bg-gray-600 disabled:cursor-not-allowed">Pass Turn</button>
+                                    </div>
+                                    <button id="create-token-btn" class="w-full mb-2 bg-indigo-600 text-white text-xs py-1 rounded">Create Token</button>
+                                ` : ''}
                                 <span class="player-name-display font-bold text-gray-400 text-xs md:text-sm">${playerState.name || (isMe ? 'YOU' : 'OPPONENT')}</span>
                                 <input type="number" id="${playerId}-life-total" class="life-total-input text-4xl lg:text-5xl font-bold" value="40" ${isMe ? '' : 'readonly'}>
                                 <div class="flex gap-1 md:gap-2 mt-2">
@@ -1582,6 +1580,10 @@
                 });
 
                 mainGridEl.addEventListener('click', (event) => {
+                    if (event.target.id === 'passTurnBtn') {
+                        handlePassTurn();
+                        return;
+                    }
                     const button = event.target.closest('button[data-player-id]');
                     if (button && button.dataset.playerId === myPlayerId) {
                         handleLifeChange(button.dataset.playerId, button.dataset.action);
@@ -1602,7 +1604,6 @@
                 librarySearchInput.addEventListener('input', filterLibrary);
                 finishInteractiveBtn.addEventListener('click', finishInteractiveAction);
                 leaveGameBtn.addEventListener('click', leaveGame);
-                passTurnBtn.addEventListener('click', handlePassTurn);
                 
                 // --- INTEGRATED CHAT LOGIC ---
                 function openChat() {
