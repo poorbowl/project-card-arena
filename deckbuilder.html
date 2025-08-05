@@ -421,6 +421,17 @@
                 return;
             }
 
+            // Check for duplicates if we are NOT editing
+            if (!editingCardId) {
+                const isDuplicate = allCards.some(card => card.name.toLowerCase() === name.toLowerCase());
+                if (isDuplicate) {
+                    showMessage(`A card named "${name}" already exists in your collection.`);
+                    saveCardBtn.disabled = false;
+                    return;
+                }
+            }
+
+
             saveCardBtn.textContent = "Saving...";
             
             try {
@@ -756,6 +767,9 @@
                 complete: async (results) => {
                     const cardsToCreate = [];
                     const errors = [];
+                    let skippedCount = 0;
+                    const existingCardNames = new Set(allCards.map(c => c.name.toLowerCase()));
+                    const namesInThisImport = new Set();
 
                     for (const row of results.data) {
                         const cardName = row['Card Name']?.trim();
@@ -770,6 +784,13 @@
                             errors.push(`Skipping Creature "${cardName}" with missing Power or Toughness.`);
                             continue;
                         }
+
+                        const lowerCaseCardName = cardName.toLowerCase();
+                        if (existingCardNames.has(lowerCaseCardName) || namesInThisImport.has(lowerCaseCardName)) {
+                            skippedCount++;
+                            continue; // Skip this card
+                        }
+                        namesInThisImport.add(lowerCaseCardName);
 
                         const cardData = {
                             name: cardName,
@@ -798,12 +819,25 @@
                                 batch.set(docRef, cardData);
                             });
                             await batch.commit();
-                            showMessage(`Successfully imported ${cardsToCreate.length} new cards! Reloading collection...`, false);
+                            
+                            let successMessage = `Successfully imported ${cardsToCreate.length} new cards!`;
+                            if (skippedCount > 0) {
+                                successMessage += ` Skipped ${skippedCount} duplicate cards.`;
+                            }
+                            successMessage += " Reloading collection...";
+                            showMessage(successMessage, false);
+
                             await loadAllCardsFromFirebase();
                         } catch (error) {
                             console.error("Error saving cards to Firestore:", error);
                             showMessage("An error occurred while saving new cards.", true);
                         }
+                    } else {
+                         let message = "No new cards were imported.";
+                         if (skippedCount > 0) {
+                             message += ` Skipped ${skippedCount} duplicate cards.`
+                         }
+                         showMessage(message, false);
                     }
                 }
             });
