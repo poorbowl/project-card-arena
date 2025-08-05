@@ -242,7 +242,7 @@
             color: white;
             cursor: pointer;
         }
-        #popout-lore {
+        #popout-flavour-text {
             font-style: italic;
             border-top: 1px solid #4b5563;
             padding-top: 8px;
@@ -350,7 +350,7 @@
             <span id="popout-pt" class="font-bold"></span>
         </div>
         <div id="popout-text" class="text-xs bg-gray-800 p-2 rounded-md whitespace-pre-wrap"></div>
-        <div id="popout-lore" class="text-xs text-gray-400"></div>
+        <div id="popout-flavour-text" class="text-xs text-gray-400"></div>
     </div>
 
 
@@ -396,7 +396,7 @@
             const popoutTypeEl = document.getElementById('popout-type');
             const popoutPtEl = document.getElementById('popout-pt');
             const popoutTextEl = document.getElementById('popout-text');
-            const popoutLoreEl = document.getElementById('popout-lore');
+            const popoutFlavourTextEl = document.getElementById('popout-flavour-text');
             const librarySearchModal = document.getElementById('library-search-modal');
             const librarySearchClose = document.getElementById('library-search-close');
             const librarySearchInput = document.getElementById('library-search-input');
@@ -942,14 +942,21 @@
                     popoutNameEl.textContent = cardData.name;
                     popoutCostEl.innerHTML = parseManaCost(cardData.cost);
                     popoutImgEl.src = cardData.imageUrl;
-                    popoutTypeEl.textContent = cardData.type;
+                    
+                    // UPDATED: Combine type and subtype
+                    let typeLine = cardData.type || '';
+                    if (cardData.subtype) {
+                        typeLine += ` — ${cardData.subtype}`;
+                    }
+                    popoutTypeEl.textContent = typeLine;
+                    
                     popoutTextEl.innerHTML = (cardData.text || '').replace(/\n/g, '<br>');
                     
-                    if (cardData.lore) {
-                        popoutLoreEl.innerHTML = (cardData.lore || '').replace(/\n/g, '<br>');
-                        popoutLoreEl.classList.remove('hidden');
+                    if (cardData.flavourText) {
+                        popoutFlavourTextEl.innerHTML = (cardData.flavourText || '').replace(/\n/g, '<br>');
+                        popoutFlavourTextEl.classList.remove('hidden');
                     } else {
-                        popoutLoreEl.classList.add('hidden');
+                        popoutFlavourTextEl.classList.add('hidden');
                     }
                     
                     if (cardData.power && cardData.toughness) {
@@ -1496,7 +1503,24 @@
                                 if (openSlot) {
                                     myPlayerId = openSlot;
                                     const startingLife = p1 ? p1.life : 40; 
-                                    currentGameState.players[openSlot] = { uid: myUserId, name: `Player ${openSlot.slice(1)}`, life: startingLife, deck: [], hand: [], battlefield: [], graveyard:[], exile:[], commander:[], deckLoaded: false };
+                                    const pendingData = JSON.parse(localStorage.getItem('pendingJoinData'));
+                                    if (pendingData) {
+                                        currentGameState.players[openSlot] = { 
+                                            uid: myUserId, 
+                                            name: pendingData.playerName, 
+                                            life: startingLife, 
+                                            deck: pendingData.deck, 
+                                            hand: [], 
+                                            battlefield: [], 
+                                            graveyard:[], 
+                                            exile:[], 
+                                            commander: pendingData.commanders, 
+                                            deckLoaded: true 
+                                        };
+                                        localStorage.removeItem('pendingJoinData');
+                                    } else {
+                                        currentGameState.players[openSlot] = { uid: myUserId, name: `Player ${openSlot.slice(1)}`, life: startingLife, deck: [], hand: [], battlefield: [], graveyard:[], exile:[], commander:[], deckLoaded: false };
+                                    }
                                 }
                             }
 
@@ -1517,15 +1541,6 @@
                         }
                         return currentGameState;
                     });
-
-                    // NEW: Logic to handle joining with a pre-selected deck
-                    const pendingData = localStorage.getItem('pendingJoinData');
-                    if (pendingData && myPlayerId !== 'p1') {
-                        const { playerName, deck, commanders } = JSON.parse(pendingData);
-                        loadDeckForPlayer(deck, commanders, playerName);
-                        localStorage.removeItem('pendingJoinData');
-                    }
-
 
                     gameRef.on('value', (snapshot) => {
                         const newGameState = snapshot.val();

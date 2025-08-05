@@ -53,6 +53,10 @@
                             <input type="text" id="cardName" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
                         </div>
                         <div>
+                            <label for="cardImage" class="block text-sm font-medium text-gray-400">Card Image (Optional)</label>
+                            <input type="file" id="cardImage" accept="image/*" class="mt-1 block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700">
+                        </div>
+                        <div>
                             <label for="cardType" class="block text-sm font-medium text-gray-400">Card Type</label>
                             <select id="cardType" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
                                 <option>Creature</option>
@@ -65,20 +69,20 @@
                             </select>
                         </div>
                         <div>
+                            <label for="cardSubtype" class="block text-sm font-medium text-gray-400">Card Subtype (e.g. Human Soldier)</label>
+                            <input type="text" id="cardSubtype" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                        </div>
+                         <div class="col-span-1 md:col-span-2">
                             <label for="manaCost" class="block text-sm font-medium text-gray-400">Mana Cost (e.g., {2}{W}{U})</label>
                             <input type="text" id="manaCost" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                        </div>
-                        <div>
-                            <label for="cardImage" class="block text-sm font-medium text-gray-400">Card Image (Optional)</label>
-                            <input type="file" id="cardImage" accept="image/*" class="mt-1 block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700">
                         </div>
                         <div class="col-span-1 md:col-span-2">
                             <label for="cardText" class="block text-sm font-medium text-gray-400">Text Box</label>
                             <textarea id="cardText" rows="3" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"></textarea>
                         </div>
                         <div class="col-span-1 md:col-span-2">
-                            <label for="cardLore" class="block text-sm font-medium text-gray-400">Lore (Flavor Text)</label>
-                            <textarea id="cardLore" rows="2" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+                            <label for="cardFlavourText" class="block text-sm font-medium text-gray-400">Flavour Text</label>
+                            <textarea id="cardFlavourText" rows="2" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"></textarea>
                         </div>
                         <div id="creatureFields" class="hidden col-span-1 md:col-span-2 grid grid-cols-2 gap-4">
                             <div>
@@ -112,7 +116,7 @@
                         <ul class="list-disc list-inside text-gray-400 text-sm mt-2 space-y-1">
                             <li>**Mandatory Columns:** `Card Name`, `Card Type`</li>
                             <li>If `Card Type` is "Creature", `Power` and `Toughness` are also mandatory.</li>
-                            <li>**Optional Columns:** `Mana Cost`, `Text Box`, `Lore`, `Image Filename`, `Commander?` (Y/N)</li>
+                            <li>**Optional Columns:** `Card Subtype`, `Mana Cost`, `Text Box`, `Flavour Text`, `Image Filename`, `Commander?` (Y)</li>
                             <li>If `Image Filename` is blank, a placeholder will be used.</li>
                         </ul>
                     </div>
@@ -416,19 +420,17 @@
                 saveCardBtn.disabled = false;
                 return;
             }
-            if (!editingCardId && !imageFile) {
-                // No longer mandatory
-            }
 
             saveCardBtn.textContent = "Saving...";
             
             try {
-                let imageUrl = null;
+                let imageUrl;
                 const cardDataToSave = {
                     name, type,
+                    subtype: document.getElementById('cardSubtype').value.trim(),
                     cost: document.getElementById('manaCost').value.trim(),
                     text: document.getElementById('cardText').value.trim(),
-                    lore: document.getElementById('cardLore').value.trim(),
+                    flavourText: document.getElementById('cardFlavourText').value.trim(),
                     power: type === 'Creature' ? power : null,
                     toughness: type === 'Creature' ? toughness : null,
                     loyalty: type === 'Planeswalker' ? document.getElementById('loyalty').value : null,
@@ -447,7 +449,6 @@
                     
                     const cardIndex = allCards.findIndex(c => c.id === editingCardId);
                     if(cardIndex > -1) {
-                        // Keep old image URL if a new one wasn't uploaded
                         if (!cardDataToSave.imageUrl) {
                             cardDataToSave.imageUrl = allCards[cardIndex].imageUrl;
                         }
@@ -455,7 +456,7 @@
                     }
                     showMessage(`Success: "${name}" was updated.`, false);
                 } else {
-                    cardDataToSave.imageUrl = imageUrl; // Can be null
+                    cardDataToSave.imageUrl = imageUrl || null;
                     const docRef = await db.collection('cards').add(cardDataToSave);
                     allCards.push({ id: docRef.id, ...cardDataToSave });
                     showMessage(`Success: "${name}" was added.`, false);
@@ -532,9 +533,10 @@
             editingCardId = cardId;
             document.getElementById('cardName').value = card.name || '';
             document.getElementById('cardType').value = card.type || 'Creature';
+            document.getElementById('cardSubtype').value = card.subtype || '';
             document.getElementById('manaCost').value = card.cost || '';
             document.getElementById('cardText').value = card.text || '';
-            document.getElementById('cardLore').value = card.lore || '';
+            document.getElementById('cardFlavourText').value = card.flavourText || '';
             document.getElementById('power').value = card.power || '';
             document.getElementById('toughness').value = card.toughness || '';
             document.getElementById('loyalty').value = card.loyalty || '';
@@ -768,17 +770,14 @@
                             errors.push(`Skipping Creature "${cardName}" with missing Power or Toughness.`);
                             continue;
                         }
-                        if (imageFilename && !uploadedImageMap.has(imageFilename)) {
-                            errors.push(`Image "${imageFilename}" for card "${cardName}" was not pre-uploaded. Skipping.`);
-                            continue;
-                        }
 
                         const cardData = {
                             name: cardName,
                             type: cardType,
+                            subtype: row['Card Subtype']?.trim() || '',
                             cost: row['Mana Cost']?.trim() || '',
                             text: row['Text Box']?.trim() || '',
-                            lore: row['Lore']?.trim() || '',
+                            flavourText: row['Flavour Text']?.trim() || '',
                             imageUrl: imageFilename ? uploadedImageMap.get(imageFilename) : null,
                             power: row['Power']?.trim() || null,
                             toughness: row['Toughness']?.trim() || null,
