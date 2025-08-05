@@ -4,26 +4,29 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Project Card Arena - Game Board</title>
-    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-    <!-- Our Firebase Initialization -->
     <script src="firebase-init.js"></script>
-    <!-- SortableJS for Drag and Drop -->
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
-    <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Custom Font -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        html, body {
+            height: 100%;
+        }
+        /* --- CODE FIX IS HERE --- */
         body {
             font-family: 'Inter', sans-serif;
             overflow: hidden;
+            /* Added these 3 lines to fix the layout */
+            display: flex;
+            flex-direction: column;
+            background-color: #111827; /* bg-gray-900 */
         }
         .game-zone {
             border: 2px dashed rgba(255, 255, 255, 0.2);
@@ -78,6 +81,7 @@
             transition: transform 0.2s ease-in-out;
             position: relative; 
             background-color: #4b5563; /* For tokens */
+            color: white; /* Ensures text on tokens is white */
         }
         .card:hover {
             transform: scale(1.1);
@@ -218,6 +222,7 @@
             background-color: #1f2937;
             border: 1px solid #4f46e5;
             z-index: 9000;
+            color: white; /* Ensures all text in popout is white */
         }
         #popout-img {
             width: 100%;
@@ -233,6 +238,12 @@
         #popout-cost img {
             width: 16px;
             height: 16px;
+        }
+        #popout-text {
+            color: white;
+        }
+        #zone-viewer-modal h2 {
+            color: white;
         }
         .interactive-card-wrapper {
             display: flex;
@@ -259,46 +270,75 @@
             transform: translateX(-50%);
             z-index: 20;
         }
+        
+        /* NEW CHAT STYLES */
         #chat-toggle-button {
             position: fixed;
-            bottom: 12.5rem;
+            bottom: 1rem;
             right: 1rem;
-            z-index: 50;
+            z-index: 1001;
         }
         #chat-notification {
             position: absolute;
-            top: -4px;
-            right: -4px;
+            top: 0px;
+            right: 0px;
             width: 12px;
             height: 12px;
             border-radius: 9999px;
             background-color: #ef4444; /* red-500 */
+            border: 2px solid #4338ca; /* indigo-700 */
         }
         #chat-container {
             position: fixed;
-            bottom: 12.5rem;
+            bottom: 1rem;
             right: 1rem;
-            width: 300px;
-            height: 250px;
-            background-color: rgba(17, 24, 39, 0.9);
-            border: 1px solid #4f46e5;
-            border-radius: 0.5rem;
+            width: 320px;
+            height: 450px;
+            background-color: rgba(31, 41, 55, 0.95); /* bg-gray-800 */
+            backdrop-filter: blur(8px);
+            border: 1px solid #4f46e5; /* indigo-500 */
+            border-radius: 0.75rem;
             display: flex;
             flex-direction: column;
+            z-index: 1000;
+            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
         }
         #chat-messages {
-            flex-grow: 1;
-            overflow-y: auto;
-            padding: 0.5rem;
             font-size: 0.875rem;
+            line-height: 1.5;
+        }
+        #chat-messages > div {
+            padding: 2px 0;
+            word-wrap: break-word;
+            color: white; /* Ensures all text inside is white */
+        }
+        #chat-messages strong {
+            color: #a5b4fc; /* indigo-300 */
+            font-weight: 600;
         }
         #chat-input {
-            border-top: 1px solid #4f46e5;
-            background-color: #374151;
+            color: white;
+        }
+
+        /* NEW STATE-BASED VISIBILITY LOGIC */
+        /* When the chat is open, hide the toggle button and show the container */
+        body[data-chat-state="open"] #chat-toggle-button {
+            display: none;
+        }
+        body[data-chat-state="open"] #chat-container {
+            display: flex;
+        }
+
+        /* When the chat is closed, show the toggle button and hide the container */
+        body[data-chat-state="closed"] #chat-toggle-button {
+            display: inline-flex; /* Use inline-flex for the button with an SVG */
+        }
+        body[data-chat-state="closed"] #chat-container {
+            display: none;
         }
     </style>
 </head>
-<body class="bg-gray-800 text-white h-screen flex flex-col">
+<body data-chat-state="open">
 
     <div class="absolute top-2 left-2 bg-black/50 p-2 rounded-lg text-xs z-20 flex items-center gap-4">
         <div>Game ID: <span id="gameIdDisplay"></span></div>
@@ -311,7 +351,7 @@
     </div>
 
     <main class="main-grid flex-grow p-2">
-    </main>
+        </main>
     
     <div id="main-player-hand-area" class="player-hand flex-shrink-0 h-48 p-2 flex items-center justify-center gap-2 relative hidden">
         <div class="zone-title">HAND</div>
@@ -326,7 +366,7 @@
             </div>
             <button id="zone-viewer-close" class="absolute top-4 right-4 text-3xl font-light text-gray-400 hover:text-white leading-none">&times;</button>
             <div id="zone-viewer-content" data-zone-name="" class="card-container min-h-[150px] justify-center">
-            </div>
+                </div>
         </div>
     </div>
     
@@ -352,7 +392,7 @@
             </div>
             <p class="text-gray-400 mb-6">Choose one of your saved decks to join the game.</p>
             <div id="deck-selection-list" class="space-y-2">
-            </div>
+                </div>
         </div>
     </div>
 
@@ -406,13 +446,24 @@
         <div id="popout-flavour-text" class="text-xs text-gray-400"></div>
     </div>
 
-    <button id="chat-toggle-button" class="bg-indigo-600 p-3 rounded-full shadow-lg relative">
+    <button id="chat-toggle-button" class="bg-indigo-600 p-3 rounded-full shadow-lg relative transition-transform hover:scale-110">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
         <div id="chat-notification" class="hidden"></div>
     </button>
-    <div id="chat-container" class="hidden">
-        <div id="chat-messages"></div>
-        <input type="text" id="chat-input" placeholder="Type a message..." class="w-full p-2 text-white">
+    
+    <div id="chat-container">
+        <div class="flex justify-between items-center p-2 bg-gray-900/50 rounded-t-lg">
+            <h3 class="font-bold text-indigo-300">Game Chat</h3>
+            <button id="chat-minimize-button" class="p-1 rounded-full hover:bg-gray-600">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M5 10a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1z" clip-rule="evenodd" />
+                </svg>
+            </button>
+        </div>
+        <div id="chat-messages" class="flex-grow p-2 overflow-y-auto"></div>
+        <div class="p-2 border-t border-gray-700">
+            <input type="text" id="chat-input" placeholder="Type a message..." class="w-full p-2 text-white bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+        </div>
     </div>
 
 
@@ -467,8 +518,11 @@
             const leaveGameBtn = document.getElementById('leaveGameBtn');
             const turnIndicatorEl = document.getElementById('turn-indicator');
             const passTurnBtn = document.getElementById('passTurnBtn');
+            
+            // CHAT ELEMENT REFERENCES
             const chatContainer = document.getElementById('chat-container');
             const chatToggleButton = document.getElementById('chat-toggle-button');
+            const chatMinimizeButton = document.getElementById('chat-minimize-button');
             const chatNotification = document.getElementById('chat-notification');
             const chatMessagesEl = document.getElementById('chat-messages');
             const chatInputEl = document.getElementById('chat-input');
@@ -572,7 +626,7 @@
                 if (!gameState || !gameState.players || !myPlayerId) return;
 
                 const myPlayerState = gameState.players[myPlayerId];
-                if (myPlayerId !== 'p1' && !myPlayerState.deckLoaded) {
+                if (myPlayerId !== 'p1' && myPlayerState && !myPlayerState.deckLoaded) {
                     showDeckSelectionModal();
                     return;
                 }
@@ -590,7 +644,7 @@
                 Object.values(gameState.players).forEach(player => {
                     const zones = ['hand', 'battlefield', 'graveyard', 'exile', 'commander', 'deck'];
                     zones.forEach(zone => {
-                        if (player[zone]) {
+                        if (player && player[zone]) {
                             player[zone].forEach(card => {
                                 if (card && card.instanceId) {
                                     cardDataMap.set(card.instanceId, card);
@@ -608,7 +662,9 @@
                 passTurnBtn.disabled = currentPlayerId !== myPlayerId;
 
                 document.querySelectorAll('.player-area').forEach(el => el.classList.remove('active-player-turn'));
-                document.getElementById(`player-area-${currentPlayerId}`)?.classList.add('active-player-turn');
+                if (currentPlayerId) {
+                    document.getElementById(`player-area-${currentPlayerId}`)?.classList.add('active-player-turn');
+                }
 
 
                 orderedPlayerIds.forEach(playerId => {
@@ -772,7 +828,7 @@
             function showContextMenu(event) {
                 event.preventDefault();
                 hideContextMenu();
-            
+                
                 const cardEl = event.currentTarget;
                 const instanceId = cardEl.dataset.instanceId;
                 const parentZoneEl = cardEl.closest('[data-zone-name]');
@@ -781,11 +837,11 @@
                 if (cardEl.closest('#library-search-modal')) {
                     parentZoneName = 'deck';
                 }
-            
+                
                 contextMenuCard = { instanceId, fromZone: parentZoneName };
-            
+                
                 let menuHTML = '';
-            
+                
                 if (parentZoneName === 'battlefield') {
                     const cardData = gameState.players[myPlayerId]?.battlefield.find(c => c.instanceId === instanceId);
                     if (cardData && cardData.isToken) {
@@ -821,7 +877,7 @@
                     });
                     menuHTML += '</div>';
                 }
-            
+                
                 contextMenu.innerHTML = menuHTML;
                 contextMenu.classList.remove('hidden');
 
@@ -961,7 +1017,7 @@
                                 playerState[toZone].unshift(cardToMove);
                            }
                         } else {
-                            playerState[toZone].push(cardToMove);
+                             playerState[toZone].push(cardToMove);
                         }
                     }
                     return playerState;
@@ -1163,7 +1219,7 @@
                 if (cards.length === 0) {
                     zoneViewerContent.innerHTML = '<p class="text-gray-500">This zone is empty.</p>';
                 } else {
-                    cards.slice().reverse().forEach(card => {
+                     cards.slice().reverse().forEach(card => {
                          const cardEl = createCardElement(card);
                          zoneViewerContent.appendChild(cardEl);
                     });
@@ -1455,13 +1511,26 @@
                 }
             }
 
-            // --- NEW: Chat and Turn Functions ---
             function handlePassTurn() {
                 gameRef.transaction(currentGameState => {
-                    if (currentGameState) {
-                        const currentTurn = currentGameState.currentPlayerIndex;
-                        const nextTurn = (currentTurn + 1) % currentGameState.turnOrder.length;
-                        currentGameState.currentPlayerIndex = nextTurn;
+                    if (currentGameState && currentGameState.players && currentGameState.turnOrder) {
+                        const oldTurnOrder = currentGameState.turnOrder;
+                        const currentPlayerId = oldTurnOrder[currentGameState.currentPlayerIndex];
+
+                        const newPlayerIds = Object.keys(currentGameState.players).sort();
+                        currentGameState.turnOrder = newPlayerIds;
+
+                        if (newPlayerIds.length > 0) {
+                            const currentTurnIndex = newPlayerIds.indexOf(currentPlayerId);
+                            
+                            let nextPlayerIndex;
+                            if (currentTurnIndex === -1) {
+                                nextPlayerIndex = currentGameState.currentPlayerIndex % newPlayerIds.length;
+                            } else {
+                                nextPlayerIndex = (currentTurnIndex + 1) % newPlayerIds.length;
+                            }
+                            currentGameState.currentPlayerIndex = nextPlayerIndex;
+                        }
                     }
                     return currentGameState;
                 });
@@ -1470,9 +1539,9 @@
             function handleSendMessage(event) {
                 if (event.key === 'Enter') {
                     const messageText = chatInputEl.value.trim();
-                    if (messageText) {
+                    if (messageText && gameState.players && gameState.players[myPlayerId]) {
                         const message = {
-                            sender: gameState.players[myPlayerId].name,
+                            sender: gameState.players[myPlayerId].name || 'Player',
                             text: messageText,
                             timestamp: firebase.database.ServerValue.TIMESTAMP
                         };
@@ -1489,15 +1558,6 @@
                 chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight; // Auto-scroll
             }
 
-            function toggleChat() {
-                chatContainer.classList.toggle('hidden');
-                if (!chatContainer.classList.contains('hidden')) {
-                    chatNotification.classList.add('hidden');
-                    chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
-                }
-            }
-
-
             async function initializeGame() {
                 contextMenu.addEventListener('click', handleContextMenuClick);
                 
@@ -1509,7 +1569,7 @@
                 window.addEventListener('contextmenu', (e) => {
                      const target = e.target;
                      if (!target.closest('.card') && !target.closest(`#${myPlayerId}-library`)) {
-                        hideContextMenu();
+                         hideContextMenu();
                      }
                 });
 
@@ -1535,8 +1595,20 @@
                 finishInteractiveBtn.addEventListener('click', finishInteractiveAction);
                 leaveGameBtn.addEventListener('click', leaveGame);
                 passTurnBtn.addEventListener('click', handlePassTurn);
-                chatToggleButton.addEventListener('click', toggleChat);
+                
+                // --- INTEGRATED CHAT LOGIC ---
+                function openChat() {
+                    document.body.dataset.chatState = 'open';
+                    chatNotification.classList.add('hidden');
+                    chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+                }
+                function minimizeChat() {
+                    document.body.dataset.chatState = 'closed';
+                }
+                chatToggleButton.addEventListener('click', openChat);
+                chatMinimizeButton.addEventListener('click', minimizeChat);
                 chatInputEl.addEventListener('keydown', handleSendMessage);
+                // --- END INTEGRATED CHAT LOGIC ---
 
                 const tokenCreateBtn = document.getElementById('token-creator-create');
                 const tokenCancelBtn = document.getElementById('token-creator-cancel');
@@ -1629,55 +1701,56 @@
                                     const startingLife = p1 ? p1.life : 40; 
                                     const pendingData = JSON.parse(localStorage.getItem('pendingJoinData'));
                                     if (pendingData) {
-                                        currentGameState.players[openSlot] = { 
-                                            uid: myUserId, 
-                                            name: pendingData.playerName, 
-                                            life: startingLife, 
-                                            deck: pendingData.deck, 
-                                            hand: [], 
-                                            battlefield: [], 
-                                            graveyard:[], 
-                                            exile:[], 
-                                            commander: pendingData.commanders, 
-                                            deckLoaded: true 
-                                        };
-                                        localStorage.removeItem('pendingJoinData');
+                                         currentGameState.players[openSlot] = { 
+                                             uid: myUserId, 
+                                             name: pendingData.playerName, 
+                                             life: startingLife, 
+                                             deck: pendingData.deck, 
+                                             hand: [], 
+                                             battlefield: [], 
+                                             graveyard:[], 
+                                             exile:[], 
+                                             commander: pendingData.commanders, 
+                                             deckLoaded: true 
+                                         };
+                                         localStorage.removeItem('pendingJoinData');
                                     } else {
-                                        currentGameState.players[openSlot] = { uid: myUserId, name: `Player ${openSlot.slice(1)}`, life: startingLife, deck: [], hand: [], battlefield: [], graveyard:[], exile:[], commander:[], deckLoaded: false };
+                                         currentGameState.players[openSlot] = { uid: myUserId, name: `Player ${openSlot.slice(1)}`, life: startingLife, deck: [], hand: [], battlefield: [], graveyard:[], exile:[], commander:[], deckLoaded: false };
                                     }
                                 }
                             }
 
-                            // Initialize turn order if it doesn't exist
-                            if (!currentGameState.turnOrder) {
-                                currentGameState.turnOrder = Object.keys(currentGameState.players).sort();
+                            // Initialize or update turn order
+                            const playerIds = Object.keys(currentGameState.players).sort();
+                            currentGameState.turnOrder = playerIds;
+                            if (currentGameState.currentPlayerIndex === undefined || currentGameState.currentPlayerIndex >= playerIds.length) {
                                 currentGameState.currentPlayerIndex = 0;
                             }
 
                             const p1 = currentGameState.players.p1;
                              if (myPlayerId === 'p1' && p1) {
-                                if (p1.deck && !p1.shuffled) {
-                                    const deck = p1.deck || [];
-                                    shuffle(deck);
-                                    p1.deck = deck;
-                                    p1.shuffled = true;
-                                }
-                                if (p1.commander && p1.commander.length > 0) {
-                                    p1.commander.forEach(c => {
-                                        if (!c.instanceId) c.instanceId = `card-${Date.now()}-${Math.random()}`;
-                                    });
-                                }
-                            }
+                                 if (p1.deck && !p1.shuffled) {
+                                     const deck = p1.deck || [];
+                                     shuffle(deck);
+                                     p1.deck = deck;
+                                     p1.shuffled = true;
+                                 }
+                                 if (p1.commander && p1.commander.length > 0) {
+                                     p1.commander.forEach(c => {
+                                         if (!c.instanceId) c.instanceId = `card-${Date.now()}-${Math.random()}`;
+                                     });
+                                 }
+                             }
                         }
                         return currentGameState;
                     });
 
-                    // NEW: Chat Listener
+                    // CHAT LISTENER
                     const chatRef = gameRef.child('chat');
                     chatRef.on('child_added', (snapshot) => {
                         const message = snapshot.val();
                         renderChatMessage(message);
-                        if (chatContainer.classList.contains('hidden')) {
+                        if (document.body.dataset.chatState === 'closed') {
                             chatNotification.classList.remove('hidden');
                         }
                     });
