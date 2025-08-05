@@ -735,20 +735,29 @@
                                 <div class="zone-title">BATTLEFIELD</div>
                                 <div id="${playerId}-battlefield-cards" data-zone-name="battlefield" class="card-container"></div>
                             </div>
-                            <div class="flex-shrink-0 w-24 md:w-32 flex flex-col items-center justify-center bg-gray-800/80 rounded-lg p-2">
+                            <div class="flex-shrink-0 w-24 md:w-32 flex flex-col items-center ${isMe ? 'justify-between' : 'justify-center'} bg-gray-800/80 rounded-lg p-2">
                                 ${isMe ? `
-                                    <div class="w-full mb-2 text-center">
+                                    <div class="w-full text-center">
                                         <div id="turn-indicator" class="font-bold text-sm mb-1"></div>
                                         <button id="passTurnBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs py-1 rounded-lg disabled:bg-gray-600 disabled:cursor-not-allowed">Pass Turn</button>
                                     </div>
-                                    <button id="create-token-btn" class="w-full mb-2 bg-indigo-600 text-white text-xs py-1 rounded">Create Token</button>
-                                ` : ''}
-                                <span class="player-name-display font-bold text-gray-400 text-xs md:text-sm">${playerState.name || (isMe ? 'YOU' : 'OPPONENT')}</span>
-                                <input type="number" id="${playerId}-life-total" class="life-total-input text-4xl lg:text-5xl font-bold" value="40" ${isMe ? '' : 'readonly'}>
-                                <div class="flex gap-1 md:gap-2 mt-2">
-                                    <button data-player-id="${playerId}" data-action="decrement" class="bg-red-600 w-8 h-8 md:w-10 md:h-10 text-xl md:text-2xl rounded-full">-</button>
-                                    <button data-player-id="${playerId}" data-action="increment" class="bg-green-600 w-8 h-8 md:w-10 md:h-10 text-xl md:text-2xl rounded-full">+</button>
-                                </div>
+                                    <div class="flex flex-col items-center">
+                                        <button id="create-token-btn" class="w-full mb-2 bg-indigo-600 text-white text-xs py-1 rounded">Create Token</button>
+                                        <span class="player-name-display font-bold text-gray-400 text-xs md:text-sm">${playerState.name || 'YOU'}</span>
+                                        <input type="number" id="${playerId}-life-total" class="life-total-input text-4xl lg:text-5xl font-bold" value="40">
+                                        <div class="flex gap-1 md:gap-2 mt-2">
+                                            <button data-player-id="${playerId}" data-action="decrement" class="bg-red-600 w-8 h-8 md:w-10 md:h-10 text-xl md:text-2xl rounded-full">-</button>
+                                            <button data-player-id="${playerId}" data-action="increment" class="bg-green-600 w-8 h-8 md:w-10 md:h-10 text-xl md:text-2xl rounded-full">+</button>
+                                        </div>
+                                    </div>
+                                ` : `
+                                    <span class="player-name-display font-bold text-gray-400 text-xs md:text-sm">${playerState.name || 'OPPONENT'}</span>
+                                    <input type="number" id="${playerId}-life-total" class="life-total-input text-4xl lg:text-5xl font-bold" value="40" readonly>
+                                    <div class="flex gap-1 md:gap-2 mt-2">
+                                        <button data-player-id="${playerId}" data-action="decrement" class="bg-red-600 w-8 h-8 md:w-10 md:h-10 text-xl md:text-2xl rounded-full">-</button>
+                                        <button data-player-id="${playerId}" data-action="increment" class="bg-green-600 w-8 h-8 md:w-10 md:h-10 text-xl md:text-2xl rounded-full">+</button>
+                                    </div>
+                                `}
                             </div>
                         </div>`;
                 });
