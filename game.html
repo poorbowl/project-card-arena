@@ -1712,27 +1712,38 @@
                     const { user } = await firebase.auth().signInAnonymously();
                     myUserId = user.uid;
 
-                    await gameRef.transaction(currentGameState => {
-                          if (currentGameState) {
+                    const { committed, snapshot: finalSnapshot } = await gameRef.transaction(currentGameState => {
+                        if (currentGameState) {
                             let isAlreadyInGame = false;
+                            let localPlayerId = null;
                             if (currentGameState.players) {
                                 Object.entries(currentGameState.players).forEach(([pId, pData]) => {
                                     if (pData && pData.uid === myUserId) {
                                         isAlreadyInGame = true;
-                                        myPlayerId = pId;
+                                        localPlayerId = pId;
                                     }
                                 });
                             } else {
                                 currentGameState.players = {};
                             }
 
-                            if (!isAlreadyInGame) {
+                            const pendingData = JSON.parse(localStorage.getItem('pendingJoinData'));
+
+                            if (isAlreadyInGame && pendingData && currentGameState.players[localPlayerId] && !currentGameState.players[localPlayerId].deckLoaded) {
+                                const playerToUpdate = currentGameState.players[localPlayerId];
+                                playerToUpdate.name = pendingData.playerName;
+                                playerToUpdate.deck = pendingData.deck;
+                                playerToUpdate.commander = pendingData.commanders;
+                                playerToUpdate.deckLoaded = true;
+                                localStorage.removeItem('pendingJoinData');
+                            } 
+                            else if (!isAlreadyInGame) {
                                 const p1 = currentGameState.players.p1;
                                 const openSlot = ['p2', 'p3', 'p4'].find(slot => !currentGameState.players[slot]);
                                 if (openSlot) {
-                                    myPlayerId = openSlot;
+                                    localPlayerId = openSlot;
                                     const startingLife = p1 ? p1.life : 40; 
-                                    const pendingData = JSON.parse(localStorage.getItem('pendingJoinData'));
+                                    
                                     if (pendingData) {
                                          currentGameState.players[openSlot] = { 
                                              uid: myUserId, 
@@ -1753,7 +1764,6 @@
                                 }
                             }
 
-                            // Initialize or update turn order
                             const playerIds = Object.keys(currentGameState.players).sort();
                             currentGameState.turnOrder = playerIds;
                             if (currentGameState.currentPlayerIndex === undefined || currentGameState.currentPlayerIndex >= playerIds.length) {
@@ -1761,7 +1771,7 @@
                             }
 
                             const p1 = currentGameState.players.p1;
-                             if (myPlayerId === 'p1' && p1) {
+                             if (localPlayerId === 'p1' && p1) {
                                  if (p1.deck && !p1.shuffled) {
                                      const deck = p1.deck || [];
                                      shuffle(deck);
@@ -1778,6 +1788,21 @@
                         return currentGameState;
                     });
 
+                    if (committed) {
+                        const newGameState = finalSnapshot.val();
+                        if (newGameState) {
+                            gameState = newGameState;
+                            if (gameState.players) {
+                                Object.entries(gameState.players).forEach(([pId, pData]) => {
+                                    if (pData && pData.uid === myUserId) {
+                                        myPlayerId = pId;
+                                    }
+                                });
+                            }
+                            renderBoard();
+                        }
+                    }
+
                     // CHAT LISTENER
                     const chatRef = gameRef.child('chat');
                     chatRef.on('child_added', (snapshot) => {
@@ -1792,6 +1817,13 @@
                         const newGameState = snapshot.val();
                         if (newGameState) {
                             gameState = newGameState;
+                             if (gameState.players) {
+                                Object.entries(gameState.players).forEach(([pId, pData]) => {
+                                    if (pData && pData.uid === myUserId) {
+                                        myPlayerId = pId;
+                                    }
+                                });
+                            }
                             renderBoard();
                         }
                     });

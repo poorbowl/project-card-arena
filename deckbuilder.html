@@ -165,35 +165,47 @@
         </div>
     </div>
     
-    <div class="mt-8 bg-gray-900 p-6 rounded-lg shadow-lg">
+    <div id="lobby-section" class="mt-8 bg-gray-900 p-6 rounded-lg shadow-lg">
         <h2 class="text-2xl font-semibold mb-4 text-green-400">Game Lobby</h2>
         
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-                <label for="playerName" class="block text-sm font-medium text-gray-400">Your Name</label>
-                <input type="text" id="playerName" placeholder="Enter your name..." class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+        <div id="lobby-controls">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label for="playerName" class="block text-sm font-medium text-gray-400">Your Name</label>
+                    <input type="text" id="playerName" placeholder="Enter your name..." class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label for="gameMode" class="block text-sm font-medium text-gray-400">Game Mode</label>
+                    <select id="gameMode" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="40">EDH / Commander (40 Life)</option>
+                        <option value="20">Standard / Modern (20 Life)</option>
+                    </select>
+                </div>
             </div>
-            <div>
-                <label for="gameMode" class="block text-sm font-medium text-gray-400">Game Mode</label>
-                <select id="gameMode" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                    <option value="40">EDH / Commander (40 Life)</option>
-                    <option value="20">Standard / Modern (20 Life)</option>
-                </select>
+
+            <p class="text-gray-400 mb-4">Assemble or load a deck, then start or join a game.</p>
+            
+            <div class="space-y-4">
+                <button id="createGameBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg text-lg">Create New Game</button>
+                <div class="relative">
+                    <div class="absolute inset-0 flex items-center" aria-hidden="true"><div class="w-full border-t border-gray-700"></div></div>
+                    <div class="relative flex justify-center"><span class="bg-gray-900 px-2 text-sm text-gray-500">OR</span></div>
+                </div>
+                <div class="flex gap-4">
+                    <input type="text" id="joinGameIdInput" placeholder="Enter Game ID..." class="block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    <button id="joinGameBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">Join Game</button>
+                </div>
             </div>
         </div>
 
-        <p class="text-gray-400 mb-4">Assemble or load a deck, then start or join a game.</p>
-        
-        <div class="space-y-4">
-            <button id="createGameBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg text-lg">Create New Game</button>
-            <div class="relative">
-                <div class="absolute inset-0 flex items-center" aria-hidden="true"><div class="w-full border-t border-gray-700"></div></div>
-                <div class="relative flex justify-center"><span class="bg-gray-900 px-2 text-sm text-gray-500">OR</span></div>
+        <div id="game-created-section" class="hidden text-center">
+            <h3 class="text-xl font-semibold text-green-400">Game Created!</h3>
+            <p class="text-gray-400 mt-2">Share this link with your friends to invite them:</p>
+            <div class="mt-4 flex items-center bg-gray-800 p-2 rounded-lg">
+                <input type="text" id="inviteLinkInput" readonly class="w-full bg-transparent text-gray-300 focus:outline-none">
+                <button id="copyLinkBtn" class="ml-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg">Copy</button>
             </div>
-            <div class="flex gap-4">
-                <input type="text" id="joinGameIdInput" placeholder="Enter Game ID..." class="block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                <button id="joinGameBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">Join Game</button>
-            </div>
+            <button id="enterGameBtn" class="mt-6 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg text-lg">Enter Game</button>
         </div>
 
     </div>
@@ -219,6 +231,12 @@
         const messageAreaEl = document.getElementById('message-area');
         const importCsvBtn = document.getElementById('importCsvBtn');
         const imageUploadProgressEl = document.getElementById('image-upload-progress');
+        const lobbySectionEl = document.getElementById('lobby-section');
+        const lobbyControlsEl = document.getElementById('lobby-controls');
+        const gameCreatedSectionEl = document.getElementById('game-created-section');
+        const inviteLinkInputEl = document.getElementById('inviteLinkInput');
+        const copyLinkBtn = document.getElementById('copyLinkBtn');
+        const enterGameBtn = document.getElementById('enterGameBtn');
         
         let allCards = [];
         let currentDeck = [];
@@ -607,11 +625,30 @@
             };
 
             newGameRef.set(initialGameState).then(() => {
-                window.location.href = `game.html?gameId=${newGameRef.key}`;
+                const gameId = newGameRef.key;
+                const inviteLink = `${window.location.origin}/game.html?gameId=${gameId}`;
+                
+                inviteLinkInputEl.value = inviteLink;
+                enterGameBtn.onclick = () => {
+                    window.location.href = `game.html?gameId=${gameId}`;
+                };
+
+                lobbyControlsEl.classList.add('hidden');
+                gameCreatedSectionEl.classList.remove('hidden');
+                
             }).catch(error => {
                 console.error("Could not create game session: ", error);
                 showMessage("Error starting game. Could not connect to the server.");
             });
+        };
+        
+        const handleCopyLink = () => {
+            inviteLinkInputEl.select();
+            document.execCommand('copy');
+            copyLinkBtn.textContent = 'Copied!';
+            setTimeout(() => {
+                copyLinkBtn.textContent = 'Copy';
+            }, 2000);
         };
 
         const handleJoinGame = () => {
@@ -632,9 +669,11 @@
                 return;
             }
 
+            const mainDeckForGame = currentDeck.filter(card => !commanders.some(c => c.id === card.id));
+
             const pendingJoinData = {
                 playerName: playerName,
-                deck: currentDeck,
+                deck: mainDeckForGame,
                 commanders: commanders
             };
             localStorage.setItem('pendingJoinData', JSON.stringify(pendingJoinData));
@@ -856,6 +895,7 @@
                 createGameBtn.addEventListener('click', handleCreateGame);
                 joinGameBtn.addEventListener('click', handleJoinGame);
                 importCsvBtn.addEventListener('click', handleCsvImport);
+                copyLinkBtn.addEventListener('click', handleCopyLink);
                 document.getElementById('bulkImageUpload').addEventListener('change', handleImageUpload);
                 
                 await loadAllCardsFromFirebase();
