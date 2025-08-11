@@ -118,6 +118,7 @@
                             <li>If `Card Type` is "Creature", `Power` and `Toughness` are also mandatory.</li>
                             <li>**Optional Columns:** `Card Subtype`, `Mana Cost`, `Text Box`, `Flavour Text`, `Image Filename`, `Commander?` (Y)</li>
                             <li>If `Image Filename` is blank, a placeholder will be used.</li>
+                            <li>**Special Characters:** If your text contains a comma, it must be wrapped in double-quotes. If your text contains double-quotes, they must be escaped by another double-quote (e.g., `""` becomes `""""`).</li>
                         </ul>
                     </div>
                     <div>
@@ -131,6 +132,7 @@
                         <p class="text-gray-400 text-sm mt-1">CSV must have a header row with the column names listed above.</p>
                         <input type="file" id="csvFile" accept=".csv" class="mt-2 block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700">
                     </div>
+                    <div id="import-message-area" class="hidden my-4 p-3 rounded-lg"></div>
                     <button id="importCsvBtn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">Import Cards from CSV</button>
                 </div>
             </div>
@@ -229,7 +231,7 @@
         const joinGameBtn = document.getElementById('joinGameBtn');
         const joinGameIdInput = document.getElementById('joinGameIdInput');
         const messageAreaEl = document.getElementById('message-area');
-        const importCsvBtn = document.getElementById('importCsvBtn');
+        const importCsvBtn = document.getElementById('importCsvBtn'); 
         const imageUploadProgressEl = document.getElementById('image-upload-progress');
         const lobbySectionEl = document.getElementById('lobby-section');
         const lobbyControlsEl = document.getElementById('lobby-controls');
@@ -244,6 +246,7 @@
         let uploadedImageMap = new Map();
         let myUserId = null;
         let editingCardId = null; 
+        let csvFileToProcess = null;
 
         // --- TABS & FORM LOGIC ---
         const tabBtns = document.querySelectorAll('.tab-button');
@@ -268,16 +271,26 @@
         });
 
         // --- MESSAGE FUNCTIONS ---
-        const showMessage = (message, isError = true) => {
-            messageAreaEl.textContent = message;
-            messageAreaEl.classList.remove('hidden');
+        const showMessage = (message, isError = true, area = 'create') => {
+            const targetArea = area === 'import'
+                ? document.getElementById('import-message-area')
+                : document.getElementById('message-area');
+            if (!targetArea) return; 
+
+            targetArea.textContent = message;
+            targetArea.classList.remove('hidden');
             if (isError) {
-                messageAreaEl.className = 'my-4 p-3 rounded-lg bg-red-800/50 text-red-300 border border-red-700';
+                targetArea.className = 'my-4 p-3 rounded-lg bg-red-800/50 text-red-300 border border-red-700';
             } else {
-                messageAreaEl.className = 'my-4 p-3 rounded-lg bg-green-800/50 text-green-300 border border-green-700';
+                targetArea.className = 'my-4 p-3 rounded-lg bg-green-800/50 text-green-300 border border-green-700';
             }
         };
-        const hideMessage = () => messageAreaEl.classList.add('hidden');
+        const hideMessage = (area = 'create') => {
+            const targetArea = area === 'import'
+                ? document.getElementById('import-message-area')
+                : document.getElementById('message-area');
+            if(targetArea) targetArea.classList.add('hidden');
+        };
 
         // --- RENDER FUNCTIONS ---
         const renderCard = (card, container) => {
@@ -418,6 +431,13 @@
             }
         }
 
+        const isBasicLand = (cardName, cardType) => {
+            if (cardType !== 'Land') return false;
+            const basicLandNames = ['plains', 'island', 'swamp', 'mountain', 'forest'];
+            const lowerCaseName = cardName.toLowerCase();
+            return basicLandNames.some(name => lowerCaseName === name || lowerCaseName === `snow-covered ${name}`);
+        };
+
         const handleSaveCard = async () => {
             hideMessage();
             saveCardBtn.disabled = true;
@@ -439,11 +459,10 @@
                 return;
             }
 
-            // Check for duplicates if we are NOT editing
-            if (!editingCardId) {
+            if (!editingCardId && !isBasicLand(name, type)) {
                 const isDuplicate = allCards.some(card => card.name.toLowerCase() === name.toLowerCase());
                 if (isDuplicate) {
-                    showMessage(`A card named "${name}" already exists in your collection.`);
+                    showMessage(`A card named "${name}" already exists in your collection. Basic lands are an exception.`);
                     saveCardBtn.disabled = false;
                     return;
                 }
@@ -793,17 +812,31 @@
         };
 
         const handleCsvImport = () => {
-            const csvInput = document.getElementById('csvFile');
-            const file = csvInput.files[0];
+            console.log('DEBUG: handleCsvImport function CALLED.'); 
+            const file = csvFileToProcess;
+            
+            console.log('DEBUG: File to process is:', file);
+            
             if (!file) {
-                showMessage("Please select a CSV file to import.", true);
+                showMessage("Please select a CSV file to import.", true, 'import');
                 return;
             }
+            
+            showMessage("Parsing CSV file...", false, 'import');
 
             Papa.parse(file, {
                 header: true,
                 skipEmptyLines: true,
                 complete: async (results) => {
+                    console.log('DEBUG: PapaParse complete. Results:', results);
+                    
+                    if (results.errors && results.errors.length > 0) {
+                        console.error('DEBUG: PapaParse encountered errors:', results.errors);
+                        const errorMessages = results.errors.map(e => `Row ${e.row}: ${e.message}`).join('\n');
+                        showMessage(`CSV parsing failed. Please check the file format. Errors:\n${errorMessages}`, true, 'import');
+                        return;
+                    }
+
                     const cardsToCreate = [];
                     const errors = [];
                     let skippedCount = 0;
@@ -825,9 +858,9 @@
                         }
 
                         const lowerCaseCardName = cardName.toLowerCase();
-                        if (existingCardNames.has(lowerCaseCardName) || namesInThisImport.has(lowerCaseCardName)) {
+                        if (!isBasicLand(cardName, cardType) && (existingCardNames.has(lowerCaseCardName) || namesInThisImport.has(lowerCaseCardName))) {
                             skippedCount++;
-                            continue; // Skip this card
+                            continue; 
                         }
                         namesInThisImport.add(lowerCaseCardName);
 
@@ -838,7 +871,7 @@
                             cost: row['Mana Cost']?.trim() || '',
                             text: row['Text Box']?.trim() || '',
                             flavourText: row['Flavour Text']?.trim() || '',
-                            imageUrl: imageFilename ? uploadedImageMap.get(imageFilename) : null,
+                            imageUrl: imageFilename ? (uploadedImageMap.get(imageFilename) || null) : null,
                             power: row['Power']?.trim() || null,
                             toughness: row['Toughness']?.trim() || null,
                             loyalty: row['Starting Loyalty']?.trim() || null
@@ -847,7 +880,7 @@
                     }
 
                     if (errors.length > 0) {
-                        showMessage(errors.join('\n'), true);
+                        showMessage(errors.join('\n'), true, 'import');
                     }
                     
                     if (cardsToCreate.length > 0) {
@@ -864,20 +897,24 @@
                                 successMessage += ` Skipped ${skippedCount} duplicate cards.`;
                             }
                             successMessage += " Reloading collection...";
-                            showMessage(successMessage, false);
+                            showMessage(successMessage, false, 'import');
 
                             await loadAllCardsFromFirebase();
                         } catch (error) {
                             console.error("Error saving cards to Firestore:", error);
-                            showMessage("An error occurred while saving new cards.", true);
+                            showMessage("An error occurred while saving new cards.", true, 'import');
                         }
                     } else {
                          let message = "No new cards were imported.";
                          if (skippedCount > 0) {
                              message += ` Skipped ${skippedCount} duplicate cards.`
                          }
-                         showMessage(message, false);
+                         showMessage(message, false, 'import');
                     }
+                },
+                error: (err, file) => {
+                    console.error("PapaParse Error:", err);
+                    showMessage(`Error parsing CSV file: ${err.message}. Please check the file format and console for details.`, true, 'import');
                 }
             });
         };
@@ -887,16 +924,34 @@
             try {
                 const { user } = await firebase.auth().signInAnonymously();
                 myUserId = user.uid;
-                console.log("User signed in anonymously with UID:", myUserId);
+                console.log("DEBUG: User signed in anonymously with UID:", myUserId);
 
                 saveCardBtn.addEventListener('click', handleSaveCard);
                 cancelEditBtn.addEventListener('click', resetForm);
                 saveDeckBtn.addEventListener('click', handleSaveDeck);
                 createGameBtn.addEventListener('click', handleCreateGame);
                 joinGameBtn.addEventListener('click', handleJoinGame);
-                importCsvBtn.addEventListener('click', handleCsvImport);
+                
+                const importTabContent = document.getElementById('tab-content-import');
+                if (importTabContent) {
+                    importTabContent.addEventListener('click', (event) => {
+                        if (event.target.id === 'importCsvBtn') {
+                            handleCsvImport();
+                        }
+                    });
+                    console.log('DEBUG: Click listener for import tab content ADDED.');
+                } else {
+                    console.error('DEBUG: Import tab content not found.');
+                }
+
                 copyLinkBtn.addEventListener('click', handleCopyLink);
                 document.getElementById('bulkImageUpload').addEventListener('change', handleImageUpload);
+                document.getElementById('csvFile').addEventListener('change', (event) => {
+                    if (event.target.files && event.target.files.length > 0) {
+                        csvFileToProcess = event.target.files[0];
+                        console.log('DEBUG: CSV file selected and stored:', csvFileToProcess.name);
+                    }
+                });
                 
                 await loadAllCardsFromFirebase();
                 renderSavedDecks();
