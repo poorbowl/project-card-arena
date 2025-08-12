@@ -792,7 +792,7 @@
                 playerRef.transaction(playerState => {
                     if (playerState && playerState.deck && playerState.deck.length > 0) {
                         const cardToDraw = playerState.deck.pop();
-                        cardToDraw.instanceId = `card-${Date.now()}-${Math.random()}`;
+                        
                         if (!playerState.hand) playerState.hand = [];
                         playerState.hand.push(cardToDraw);
                     }
@@ -846,18 +846,19 @@
             function showContextMenu(event) {
                 event.preventDefault();
                 hideContextMenu();
-                
+            
                 const cardEl = event.currentTarget;
                 const instanceId = cardEl.dataset.instanceId;
                 const parentZoneEl = cardEl.closest('[data-zone-name]');
                 let parentZoneName = parentZoneEl ? parentZoneEl.dataset.zoneName : null;
                 
+                // FIX: Correctly identify when a card is in the library search modal
                 if (cardEl.closest('#library-search-modal')) {
                     parentZoneName = 'deck';
                 }
-                
+            
                 contextMenuCard = { instanceId, fromZone: parentZoneName };
-                
+            
                 let menuHTML = '';
                 
                 if (parentZoneName === 'battlefield') {
@@ -1312,6 +1313,12 @@
             function loadDeckForPlayer(deck, commanders, playerName) {
                 if (!myPlayerId || !deck) return;
                 shuffle(deck);
+
+                deck.forEach(card => {
+                // Assign a unique instanceId to each card in the deck
+                    card.instanceId = `card-${Date.now()}-${Math.random()}`;
+            });
+
                 commanders.forEach(c => {
                     if (!c.instanceId) c.instanceId = `card-${Date.now()}-${Math.random()}`;
                 });
@@ -1745,6 +1752,16 @@
                                     const startingLife = p1 ? p1.life : 40; 
                                     
                                     if (pendingData) {
+
+                                        // ADD THIS SNIPPET HERE FOR LIBRARY SEARCH FIX
+                                       pendingData.deck.forEach(card => {
+                                           card.instanceId = `card-${Date.now()}-${Math.random()}`;
+                                       });
+                                       pendingData.commanders.forEach(card => {
+                                           card.instanceId = `card-${Date.now()}-${Math.random()}`;
+                                       });
+                                       // END SNIPPET
+
                                          currentGameState.players[openSlot] = { 
                                              uid: myUserId, 
                                              name: pendingData.playerName, 
@@ -1775,6 +1792,13 @@
                                  if (p1.deck && !p1.shuffled) {
                                      const deck = p1.deck || [];
                                      shuffle(deck);
+
+                                    // ADD THIS SNIPPET HERE
+                                      deck.forEach(card => {
+                                          card.instanceId = `card-${Date.now()}-${Math.random()}`;
+                                      });
+                                      // END SNIPPET
+
                                      p1.deck = deck;
                                      p1.shuffled = true;
                                  }
