@@ -1752,32 +1752,35 @@
                                     const startingLife = p1 ? p1.life : 40; 
                                     
                                     if (pendingData) {
+                                    // This is the complete, final version for joining players
+                                    shuffle(pendingData.deck); // Shuffles the deck
+                                    
+                                    pendingData.deck.forEach(card => {
+                                        card.instanceId = `card-${Date.now()}-${Math.random()}`;
+                                    });
 
-                                        // ADD THIS SNIPPET HERE FOR LIBRARY SEARCH FIX
-                                       pendingData.deck.forEach(card => {
-                                           card.instanceId = `card-${Date.now()}-${Math.random()}`;
-                                       });
-                                       pendingData.commanders.forEach(card => {
-                                           card.instanceId = `card-${Date.now()}-${Math.random()}`;
-                                       });
-                                       // END SNIPPET
-
-                                         currentGameState.players[openSlot] = { 
-                                             uid: myUserId, 
-                                             name: pendingData.playerName, 
-                                             life: startingLife, 
-                                             deck: pendingData.deck, 
-                                             hand: [], 
-                                             battlefield: [], 
-                                             graveyard:[], 
-                                             exile:[], 
-                                             commander: pendingData.commanders, 
-                                             deckLoaded: true 
-                                         };
-                                         localStorage.removeItem('pendingJoinData');
-                                    } else {
-                                         currentGameState.players[openSlot] = { uid: myUserId, name: `Player ${openSlot.slice(1)}`, life: startingLife, deck: [], hand: [], battlefield: [], graveyard:[], exile:[], commander:[], deckLoaded: false };
+                                    if (pendingData.commanders) { // Safety check for commanders
+                                        pendingData.commanders.forEach(card => {
+                                            card.instanceId = `card-${Date.now()}-${Math.random()}`;
+                                        });
                                     }
+                                    
+                                    currentGameState.players[openSlot] = { 
+                                        uid: myUserId, 
+                                        name: pendingData.playerName, 
+                                        life: startingLife, 
+                                        deck: pendingData.deck, 
+                                        hand: [], 
+                                        battlefield: [], 
+                                        graveyard:[], 
+                                        exile:[], 
+                                        commander: pendingData.commanders, 
+                                        deckLoaded: true 
+                                    };
+                                    localStorage.removeItem('pendingJoinData');
+                                } else {
+                                    currentGameState.players[openSlot] = { uid: myUserId, name: `Player ${openSlot.slice(1)}`, life: startingLife, deck: [], hand: [], battlefield: [], graveyard:[], exile:[], commander:[], deckLoaded: false };
+                                }
                                 }
                             }
 
@@ -1825,19 +1828,7 @@
                             }
                             renderBoard();
                         }
-                    }
-
-                    // CHAT LISTENER
-                    const chatRef = gameRef.child('chat');
-                    chatRef.on('child_added', (snapshot) => {
-                        const message = snapshot.val();
-                        renderChatMessage(message);
-                        if (document.body.dataset.chatState === 'closed') {
-                            chatNotification.classList.remove('hidden');
-                        }
-                    });
-
-                    gameRef.on('value', (snapshot) => {
+                        gameRef.on('value', (snapshot) => {
                         const newGameState = snapshot.val();
                         if (newGameState) {
                             gameState = newGameState;
@@ -1851,6 +1842,19 @@
                             renderBoard();
                         }
                     });
+                    }
+
+                    // CHAT LISTENER
+                    const chatRef = gameRef.child('chat');
+                    chatRef.on('child_added', (snapshot) => {
+                        const message = snapshot.val();
+                        renderChatMessage(message);
+                        if (document.body.dataset.chatState === 'closed') {
+                            chatNotification.classList.remove('hidden');
+                        }
+                    });
+
+                    
                 } catch (error) {
                     console.error("Initialization failed:", error);
                     document.body.innerHTML = '<h1 class="text-red-500 text-2xl p-8">Error: Could not connect to the server.</h1>';
