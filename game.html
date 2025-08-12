@@ -1616,7 +1616,7 @@
                         return;
                     }
                     const button = event.target.closest('button[data-player-id]');
-                    if (button && button.dataset.playerId === myPlayerId) {
+                    if (button) { // This allows the buttons to work for any player
                         handleLifeChange(button.dataset.playerId, button.dataset.action);
                     }
                 });
