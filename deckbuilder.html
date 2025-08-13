@@ -35,6 +35,38 @@
             color: #a5b4fc;
             font-weight: bold;
         }
+        /* NEW: Styles for the card pop-out */
+        #card-popout {
+            position: fixed;
+            display: none;
+            z-index: 100;
+            pointer-events: none; /* Allows mouse events to pass through */
+            border-radius: 12px;
+            overflow: hidden;
+            border: 2px solid #4f46e5;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+        #card-popout img {
+            width: 250px;
+            height: 350px;
+            display: block;
+        }
+        /* NEW: Styles for color pips */
+        .color-pip {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 3px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .pip-W { background-color: #f9faf4; }
+        .pip-U { background-color: #aae0fa; }
+        .pip-B { background-color: #cbc2bf; }
+        .pip-R { background-color: #f9aa8f; }
+        .pip-G { background-color: #9bd3ae; }
+        .pip-M { background: linear-gradient(135deg, #f9aa8f 25%, #aae0fa 25%, #aae0fa 50%, #9bd3ae 50%, #9bd3ae 75%, #cbc2bf 75%); }
+        .pip-C { background-color: #cec8c3; }
     </style>
 </head>
 <body class="bg-gray-800 text-white p-4 md:p-8">
@@ -196,7 +228,7 @@
         <div class="lg:col-span-2">
             <h2 class="text-2xl font-semibold mb-4">My Card Collection</h2>
             
-            <!-- NEW: Filter and Sort Controls -->
+            <!-- Filter and Sort Controls -->
             <div class="bg-gray-900 p-4 rounded-lg mb-4 flex flex-wrap gap-4 items-center">
                 <input type="text" id="filterName" placeholder="Filter by name..." class="flex-grow bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 min-w-[200px]">
                 <select id="filterType" class="bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
@@ -208,10 +240,6 @@
                     <option>Enchantment</option>
                     <option>Artifact</option>
                     <option>Land</option>
-                </select>
-                <select id="filterSort" class="bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                    <option value="name_asc">Sort: Name (A-Z)</option>
-                    <option value="name_desc">Sort: Name (Z-A)</option>
                 </select>
                 <select id="filterColor" class="bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
                     <option value="">All Colors</option>
@@ -227,6 +255,10 @@
                     <option value="">All Sources</option>
                     <option value="custom">User-Created</option>
                     <option value="scryfall">Scryfall</option>
+                </select>
+                <select id="filterSort" class="bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    <option value="name_asc">Sort: Name (A-Z)</option>
+                    <option value="name_desc">Sort: Name (Z-A)</option>
                 </select>
             </div>
 
@@ -300,6 +332,11 @@
 
     </div>
 
+    <!-- NEW: Pop-out element for card previews -->
+    <div id="card-popout">
+        <img id="popout-card-image" src="" alt="Card Preview">
+    </div>
+
     <script>
         // --- DOM Elements (Main App) ---
         const cardCollectionEl = document.getElementById('cardCollection');
@@ -346,6 +383,11 @@
         const filterSortSelect = document.getElementById('filterSort');
         const filterColorSelect = document.getElementById('filterColor');
         const filterSourceSelect = document.getElementById('filterSource');
+        
+        // --- DOM Elements (Pop-out) ---
+        const cardPopoutEl = document.getElementById('card-popout');
+        const popoutCardImageEl = document.getElementById('popout-card-image');
+
 
         // --- Global State ---
         let allCards = [];
@@ -410,11 +452,10 @@
         // --- RENDER FUNCTIONS ---
         const renderCard = (card, container) => {
             const cardWrapper = document.createElement('div');
-            cardWrapper.className = 'p-2 bg-gray-700 rounded-lg flex flex-col items-center';
+            cardWrapper.className = 'p-2 bg-gray-700 rounded-lg flex flex-col items-center justify-between';
             
-            const cardImageEl = document.createElement('div');
-            cardImageEl.className = 'cursor-pointer';
-            cardImageEl.dataset.cardId = card.id;
+            const clickableArea = document.createElement('div');
+            clickableArea.className = 'cursor-pointer text-center';
             
             const img = document.createElement('img');
             img.src = card.imageUrl || 'https://placehold.co/100x140/2d3748/e2e8f0?text=No+Image';
@@ -423,12 +464,31 @@
 
             const name = document.createElement('span');
             name.textContent = card.name;
-            name.className = 'text-xs text-center';
+            name.className = 'text-xs text-center font-semibold';
 
-            cardImageEl.appendChild(img);
-            cardImageEl.appendChild(name);
-            cardImageEl.addEventListener('click', () => addCardToDeck(card));
+            clickableArea.appendChild(img);
+            clickableArea.appendChild(name);
+            clickableArea.addEventListener('click', () => addCardToDeck(card));
             
+            // NEW: Card info section
+            const infoDiv = document.createElement('div');
+            infoDiv.className = 'text-center my-2 w-full';
+
+            const typeText = document.createElement('p');
+            typeText.textContent = card.type;
+            typeText.className = 'text-xs text-gray-400 truncate';
+            infoDiv.appendChild(typeText);
+
+            const colorPips = document.createElement('div');
+            colorPips.className = 'flex justify-center mt-1';
+            const colors = getCardColorIdentity(card.cost);
+            colors.forEach(color => {
+                const pip = document.createElement('span');
+                pip.className = `color-pip pip-${color}`;
+                colorPips.appendChild(pip);
+            });
+            infoDiv.appendChild(colorPips);
+
             const buttonBar = document.createElement('div');
             buttonBar.className = 'flex justify-around w-full mt-2';
             
@@ -445,8 +505,18 @@
             buttonBar.appendChild(editBtn);
             buttonBar.appendChild(deleteBtn);
 
-            cardWrapper.appendChild(cardImageEl);
+            cardWrapper.appendChild(clickableArea);
+            cardWrapper.appendChild(infoDiv);
             cardWrapper.appendChild(buttonBar);
+
+            // NEW: Event listeners for the pop-out
+            cardWrapper.addEventListener('mouseenter', () => {
+                popoutCardImageEl.src = card.imageUrl || 'https://placehold.co/250x350/2d3748/e2e8f0?text=No+Image';
+                cardPopoutEl.style.display = 'block';
+            });
+            cardWrapper.addEventListener('mouseleave', () => {
+                cardPopoutEl.style.display = 'none';
+            });
 
             container.appendChild(cardWrapper);
         };
@@ -457,19 +527,19 @@
         const getCardColorIdentity = (manaCost) => {
             if (!manaCost) return ['C']; // Colorless if no cost
             const colors = new Set();
-            if (manaCost.includes('{W}')) colors.add('W');
-            if (manaCost.includes('{U}')) colors.add('U');
-            if (manaCost.includes('{B}')) colors.add('B');
-            if (manaCost.includes('{R}')) colors.add('R');
-            if (manaCost.includes('{G}')) colors.add('G');
+            if (manaCost.includes('W')) colors.add('W');
+            if (manaCost.includes('U')) colors.add('U');
+            if (manaCost.includes('B')) colors.add('B');
+            if (manaCost.includes('R')) colors.add('R');
+            if (manaCost.includes('G')) colors.add('G');
             
             if (colors.size === 0) return ['C']; // Also colorless (e.g., artifacts, lands)
-            if (colors.size > 1) return ['M']; // Multi-color
+            if (colors.size > 1) return ['M', ...Array.from(colors)]; // Return M for multi-color, plus individual colors
             return Array.from(colors);
         };
 
         const renderFilteredCollection = () => {
-            let filteredCards = [...allCards];
+            let filteredCards = [...allCards]; // Start with a copy of all cards
 
             // 1. Filter by name (case-insensitive)
             const nameQuery = filterNameInput.value.toLowerCase();
@@ -510,11 +580,6 @@
             filteredCards.forEach(card => renderCard(card, cardCollectionEl));
         };
 
-        /**
-         * MODIFIED: This function now just calls the new master rendering function.
-         * This ensures that any time the collection is supposed to be refreshed,
-         * the filters and sorting are automatically applied.
-         */
         const renderCollection = () => {
             renderFilteredCollection();
         };
@@ -600,7 +665,6 @@
             try {
                 const snapshot = await db.collection('cards').get();
                 allCards = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                // MODIFIED: Sorting is now handled by renderFilteredCollection, so we remove it from here.
                 renderCollection();
                 console.log(`Loaded ${allCards.length} cards from Firestore.`);
             } catch (error) {
@@ -689,7 +753,6 @@
                     showMessage(`Success: "${name}" was added.`, false);
                 }
                 
-                // MODIFIED: Sorting is now handled by renderFilteredCollection
                 renderCollection();
                 resetForm();
 
@@ -1302,12 +1365,19 @@
                 });
                 addDirectlyBtn.addEventListener('click', handleAddDirectly);
 
-                // NEW: Collection Filter Listeners
+                // Collection Filter Listeners
                 filterNameInput.addEventListener('input', renderFilteredCollection);
                 filterTypeSelect.addEventListener('change', renderFilteredCollection);
                 filterSortSelect.addEventListener('change', renderFilteredCollection);
                 filterColorSelect.addEventListener('change', renderFilteredCollection);
                 filterSourceSelect.addEventListener('change', renderFilteredCollection);
+
+                // NEW: Mousemove listener for the pop-out position
+                document.addEventListener('mousemove', (e) => {
+                    // Position the popout slightly to the right and below the cursor
+                    cardPopoutEl.style.left = (e.pageX + 20) + 'px';
+                    cardPopoutEl.style.top = (e.pageY + 20) + 'px';
+                });
                 
                 // Initial Load
                 await loadAllCardsFromFirebase();
