@@ -213,6 +213,21 @@
                     <option value="name_asc">Sort: Name (A-Z)</option>
                     <option value="name_desc">Sort: Name (Z-A)</option>
                 </select>
+                <select id="filterColor" class="bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    <option value="">All Colors</option>
+                    <option value="W">White</option>
+                    <option value="U">Blue</option>
+                    <option value="B">Black</option>
+                    <option value="R">Red</option>
+                    <option value="G">Green</option>
+                    <option value="C">Colorless</option>
+                    <option value="M">Multi-Color</option>
+                </select>
+                <select id="filterSource" class="bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    <option value="">All Sources</option>
+                    <option value="custom">User-Created</option>
+                    <option value="scryfall">Scryfall</option>
+                </select>
             </div>
 
             <div id="cardCollection" class="bg-gray-900 p-4 rounded-lg min-h-[300px] grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"></div>
@@ -329,6 +344,8 @@
         const filterNameInput = document.getElementById('filterName');
         const filterTypeSelect = document.getElementById('filterType');
         const filterSortSelect = document.getElementById('filterSort');
+        const filterColorSelect = document.getElementById('filterColor');
+        const filterSourceSelect = document.getElementById('filterSource');
 
         // --- Global State ---
         let allCards = [];
@@ -435,11 +452,24 @@
         };
 
         /**
-         * NEW: This is the master function for rendering the card collection.
-         * It applies filters and sorting before displaying the cards.
+         * Helper function to determine a card's color identity from its mana cost.
          */
+        const getCardColorIdentity = (manaCost) => {
+            if (!manaCost) return ['C']; // Colorless if no cost
+            const colors = new Set();
+            if (manaCost.includes('{W}')) colors.add('W');
+            if (manaCost.includes('{U}')) colors.add('U');
+            if (manaCost.includes('{B}')) colors.add('B');
+            if (manaCost.includes('{R}')) colors.add('R');
+            if (manaCost.includes('{G}')) colors.add('G');
+            
+            if (colors.size === 0) return ['C']; // Also colorless (e.g., artifacts, lands)
+            if (colors.size > 1) return ['M']; // Multi-color
+            return Array.from(colors);
+        };
+
         const renderFilteredCollection = () => {
-            let filteredCards = [...allCards]; // Start with a copy of all cards
+            let filteredCards = [...allCards];
 
             // 1. Filter by name (case-insensitive)
             const nameQuery = filterNameInput.value.toLowerCase();
@@ -453,7 +483,22 @@
                 filteredCards = filteredCards.filter(card => card.type === typeQuery);
             }
 
-            // 3. Sort the results based on the selected option
+            // 3. Filter by color identity
+            const colorQuery = filterColorSelect.value;
+            if (colorQuery) {
+                filteredCards = filteredCards.filter(card => {
+                    const identity = getCardColorIdentity(card.cost);
+                    return identity.includes(colorQuery);
+                });
+            }
+
+            // 4. Filter by source
+            const sourceQuery = filterSourceSelect.value;
+            if (sourceQuery) {
+                filteredCards = filteredCards.filter(card => card.source === sourceQuery);
+            }
+
+            // 5. Sort the results
             const sortQuery = filterSortSelect.value;
             if (sortQuery === 'name_asc') {
                 filteredCards.sort((a, b) => a.name.localeCompare(b.name));
@@ -461,7 +506,6 @@
                 filteredCards.sort((a, b) => b.name.localeCompare(a.name));
             }
 
-            // 4. Clear the existing collection and render the final list
             cardCollectionEl.innerHTML = '';
             filteredCards.forEach(card => renderCard(card, cardCollectionEl));
         };
@@ -609,6 +653,7 @@
                 let imageUrl;
                 const cardDataToSave = {
                     name, type,
+                    source: 'custom',
                     subtype: document.getElementById('cardSubtype').value.trim(),
                     cost: document.getElementById('manaCost').value.trim(),
                     text: document.getElementById('cardText').value.trim(),
@@ -1071,6 +1116,7 @@
             return {
                 name: card.name,
                 type: type || '',
+                source: 'scryfall',
                 subtype: subtype || '',
                 cost: cardFace.mana_cost || '',
                 text: cardFace.oracle_text || '',
@@ -1260,6 +1306,8 @@
                 filterNameInput.addEventListener('input', renderFilteredCollection);
                 filterTypeSelect.addEventListener('change', renderFilteredCollection);
                 filterSortSelect.addEventListener('change', renderFilteredCollection);
+                filterColorSelect.addEventListener('change', renderFilteredCollection);
+                filterSourceSelect.addEventListener('change', renderFilteredCollection);
                 
                 // Initial Load
                 await loadAllCardsFromFirebase();
