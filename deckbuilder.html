@@ -678,7 +678,8 @@
             try {
                 await db.collection('cards').doc(cardId).delete();
 
-                if (cardToDelete.imageUrl) {
+                // FIXED: Only try to delete the image if it's a Firebase Storage URL
+                if (cardToDelete.imageUrl && cardToDelete.imageUrl.includes('firebasestorage.googleapis.com')) {
                     const imageRef = storage.refFromURL(cardToDelete.imageUrl);
                     await imageRef.delete();
                 }
