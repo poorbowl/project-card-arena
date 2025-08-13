@@ -19,6 +19,12 @@
     <style>
         body { font-family: 'Inter', sans-serif; }
         .card-image-sm { width: 100px; height: 140px; }
+        .card-preview-img {
+            width: 100px;
+            height: 140px;
+            object-fit: cover;
+            border-radius: 0.375rem; /* rounded-md */
+        }
         .tab-button.active {
             background-color: #4f46e5;
             color: white;
@@ -39,10 +45,12 @@
         <nav class="flex space-x-4" aria-label="Tabs">
             <button id="tab-btn-create" class="tab-button active px-3 py-2 font-medium text-sm rounded-t-lg">Create/Edit Card</button>
             <button id="tab-btn-import" class="tab-button px-3 py-2 font-medium text-sm rounded-t-lg">Bulk Import</button>
+            <button id="tab-btn-scryfall" class="tab-button px-3 py-2 font-medium text-sm rounded-t-lg">Scryfall Import</button>
         </nav>
     </div>
 
     <div>
+        <!-- Create/Edit Tab -->
         <div id="tab-content-create" class="tab-content active">
              <div class="bg-gray-900 p-6 rounded-lg shadow-lg">
                 <h2 id="form-title" class="text-xl font-semibold mb-4">Create New Card</h2>
@@ -107,6 +115,7 @@
                 </div>
             </div>
         </div>
+        <!-- Bulk Import (CSV) Tab -->
         <div id="tab-content-import" class="tab-content">
             <div class="bg-gray-900 p-6 rounded-lg shadow-lg">
                 <h2 class="text-xl font-semibold mb-4">Bulk Import Cards via CSV</h2>
@@ -118,7 +127,6 @@
                             <li>If `Card Type` is "Creature", `Power` and `Toughness` are also mandatory.</li>
                             <li>**Optional Columns:** `Card Subtype`, `Mana Cost`, `Text Box`, `Flavour Text`, `Image Filename`, `Commander?` (Y)</li>
                             <li>If `Image Filename` is blank, a placeholder will be used.</li>
-                            <li>**Special Characters:** If your text contains a comma, it must be wrapped in double-quotes. If your text contains double-quotes, they must be escaped by another double-quote (e.g., `""` becomes `""""`).</li>
                         </ul>
                     </div>
                     <div>
@@ -134,6 +142,51 @@
                     </div>
                     <div id="import-message-area" class="hidden my-4 p-3 rounded-lg"></div>
                     <button id="importCsvBtn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">Import Cards from CSV</button>
+                </div>
+            </div>
+        </div>
+        <!-- Scryfall Import Tab -->
+        <div id="tab-content-scryfall" class="tab-content">
+            <div class="bg-gray-900 p-6 rounded-lg shadow-lg">
+                <h1 class="text-2xl font-bold mb-2 text-indigo-400">Scryfall Bulk Importer</h1>
+                <p class="text-gray-400 mb-6">Paste a list of card names, one per line, to fetch their data from the Scryfall API.</p>
+                <!-- Input Section -->
+                <div class="mb-4">
+                    <label for="cardListInput" class="block text-lg font-medium text-gray-300">Card Names</label>
+                    <textarea id="cardListInput" rows="10" class="mt-2 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" placeholder="Sol Ring&#10;Swords to Plowshares&#10;Rhystic Study&#10;..."></textarea>
+                </div>
+                <button id="fetchBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg text-lg transition-transform transform hover:scale-105 shadow-md">
+                    Fetch Card Data
+                </button>
+                <!-- Progress and Status Section -->
+                <div id="statusArea" class="mt-4 text-center"></div>
+                <!-- Results Section -->
+                <div id="resultsArea" class="mt-6 hidden">
+                    <h2 class="text-xl font-semibold mb-4 text-green-400">Results</h2>
+                    <div id="foundCardsSection">
+                        <h3 class="text-lg font-medium text-gray-300">Found Cards (<span id="foundCount">0</span>)</h3>
+                        <div id="foundCardsGrid" class="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                            <!-- Card previews will be injected here -->
+                        </div>
+                    </div>
+                    <div id="notFoundSection" class="mt-6">
+                        <h3 class="text-lg font-medium text-red-400">Not Found (<span id="notFoundCount">0</span>)</h3>
+                        <ul id="notFoundList" class="mt-2 list-disc list-inside text-gray-400 text-sm">
+                            <!-- Not found card names will be injected here -->
+                        </ul>
+                    </div>
+                    <div class="mt-6 border-t border-gray-700 pt-6">
+                         <h3 class="text-lg font-medium text-gray-300">Save to Collection or Export</h3>
+                         <p class="text-gray-400 text-sm mb-4">You can add these cards directly to your collection or download a CSV file.</p>
+                         <div class="flex flex-col sm:flex-row gap-4">
+                            <button id="addDirectlyBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md" disabled>
+                                Add to My Collection
+                            </button>
+                            <button id="downloadCsvBtn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md" disabled>
+                                Download as CSV
+                           </button>
+                         </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -213,7 +266,7 @@
     </div>
 
     <script>
-        // DOM Elements
+        // --- DOM Elements (Main App) ---
         const cardCollectionEl = document.getElementById('cardCollection');
         const deckListEl = document.getElementById('deckList');
         const commanderListEl = document.getElementById('commanderList');
@@ -240,6 +293,19 @@
         const copyLinkBtn = document.getElementById('copyLinkBtn');
         const enterGameBtn = document.getElementById('enterGameBtn');
         
+        // --- DOM Elements (Scryfall Importer) ---
+        const cardListInput = document.getElementById('cardListInput');
+        const fetchBtn = document.getElementById('fetchBtn');
+        const statusArea = document.getElementById('statusArea');
+        const resultsArea = document.getElementById('resultsArea');
+        const foundCardsGrid = document.getElementById('foundCardsGrid');
+        const notFoundList = document.getElementById('notFoundList');
+        const foundCount = document.getElementById('foundCount');
+        const notFoundCount = document.getElementById('notFoundCount');
+        const downloadCsvBtn = document.getElementById('downloadCsvBtn');
+        const addDirectlyBtn = document.getElementById('addDirectlyBtn');
+
+        // --- Global State ---
         let allCards = [];
         let currentDeck = [];
         let commanders = [];
@@ -247,6 +313,7 @@
         let myUserId = null;
         let editingCardId = null; 
         let csvFileToProcess = null;
+        let fetchedCardsData = []; // To store the processed card data for CSV/direct export
 
         // --- TABS & FORM LOGIC ---
         const tabBtns = document.querySelectorAll('.tab-button');
@@ -272,23 +339,29 @@
 
         // --- MESSAGE FUNCTIONS ---
         const showMessage = (message, isError = true, area = 'create') => {
-            const targetArea = area === 'import'
-                ? document.getElementById('import-message-area')
-                : document.getElementById('message-area');
+            const areaMap = {
+                create: document.getElementById('message-area'),
+                import: document.getElementById('import-message-area'),
+                scryfall: document.getElementById('statusArea')
+            };
+            const targetArea = areaMap[area];
             if (!targetArea) return; 
 
-            targetArea.textContent = message;
+            targetArea.innerHTML = `<p>${message}</p>`; // Use innerHTML to render as a paragraph
             targetArea.classList.remove('hidden');
             if (isError) {
-                targetArea.className = 'my-4 p-3 rounded-lg bg-red-800/50 text-red-300 border border-red-700';
+                targetArea.firstChild.className = 'text-red-400';
             } else {
-                targetArea.className = 'my-4 p-3 rounded-lg bg-green-800/50 text-green-300 border border-green-700';
+                targetArea.firstChild.className = 'text-green-400';
             }
         };
         const hideMessage = (area = 'create') => {
-            const targetArea = area === 'import'
-                ? document.getElementById('import-message-area')
-                : document.getElementById('message-area');
+            const areaMap = {
+                create: document.getElementById('message-area'),
+                import: document.getElementById('import-message-area'),
+                scryfall: document.getElementById('statusArea')
+            };
+            const targetArea = areaMap[area];
             if(targetArea) targetArea.classList.add('hidden');
         };
 
@@ -770,7 +843,7 @@
             renderSavedDecks();
         };
 
-        // --- BULK IMPORT LOGIC ---
+        // --- BULK IMPORT (CSV) LOGIC ---
         const handleImageUpload = async (event) => {
             const zipFile = event.target.files[0];
             if (!zipFile) return;
@@ -812,26 +885,17 @@
         };
 
         const handleCsvImport = () => {
-            console.log('DEBUG: handleCsvImport function CALLED.'); 
             const file = csvFileToProcess;
-            
-            console.log('DEBUG: File to process is:', file);
-            
             if (!file) {
                 showMessage("Please select a CSV file to import.", true, 'import');
                 return;
             }
-            
             showMessage("Parsing CSV file...", false, 'import');
-
             Papa.parse(file, {
                 header: true,
                 skipEmptyLines: true,
                 complete: async (results) => {
-                    console.log('DEBUG: PapaParse complete. Results:', results);
-                    
                     if (results.errors && results.errors.length > 0) {
-                        console.error('DEBUG: PapaParse encountered errors:', results.errors);
                         const errorMessages = results.errors.map(e => `Row ${e.row}: ${e.message}`).join('\n');
                         showMessage(`CSV parsing failed. Please check the file format. Errors:\n${errorMessages}`, true, 'import');
                         return;
@@ -846,8 +910,6 @@
                     for (const row of results.data) {
                         const cardName = row['Card Name']?.trim();
                         const cardType = row['Card Type']?.trim();
-                        const imageFilename = row['Image Filename']?.trim();
-
                         if (!cardName || !cardType) {
                             errors.push(`Skipping row with missing Card Name or Card Type.`);
                             continue;
@@ -871,7 +933,7 @@
                             cost: row['Mana Cost']?.trim() || '',
                             text: row['Text Box']?.trim() || '',
                             flavourText: row['Flavour Text']?.trim() || '',
-                            imageUrl: imageFilename ? (uploadedImageMap.get(imageFilename) || null) : null,
+                            imageUrl: row['Image Filename']?.trim() ? (uploadedImageMap.get(row['Image Filename'].trim()) || null) : null,
                             power: row['Power']?.trim() || null,
                             toughness: row['Toughness']?.trim() || null,
                             loyalty: row['Starting Loyalty']?.trim() || null
@@ -879,9 +941,7 @@
                         cardsToCreate.push(cardData);
                     }
 
-                    if (errors.length > 0) {
-                        showMessage(errors.join('\n'), true, 'import');
-                    }
+                    if (errors.length > 0) showMessage(errors.join('\n'), true, 'import');
                     
                     if (cardsToCreate.length > 0) {
                         try {
@@ -893,12 +953,8 @@
                             await batch.commit();
                             
                             let successMessage = `Successfully imported ${cardsToCreate.length} new cards!`;
-                            if (skippedCount > 0) {
-                                successMessage += ` Skipped ${skippedCount} duplicate cards.`;
-                            }
-                            successMessage += " Reloading collection...";
+                            if (skippedCount > 0) successMessage += ` Skipped ${skippedCount} duplicate cards.`;
                             showMessage(successMessage, false, 'import');
-
                             await loadAllCardsFromFirebase();
                         } catch (error) {
                             console.error("Error saving cards to Firestore:", error);
@@ -906,18 +962,205 @@
                         }
                     } else {
                          let message = "No new cards were imported.";
-                         if (skippedCount > 0) {
-                             message += ` Skipped ${skippedCount} duplicate cards.`
-                         }
+                         if (skippedCount > 0) message += ` Skipped ${skippedCount} duplicate cards.`
                          showMessage(message, false, 'import');
                     }
                 },
-                error: (err, file) => {
-                    console.error("PapaParse Error:", err);
-                    showMessage(`Error parsing CSV file: ${err.message}. Please check the file format and console for details.`, true, 'import');
-                }
+                error: (err) => showMessage(`Error parsing CSV file: ${err.message}.`, true, 'import')
             });
         };
+
+        // --- SCRYFALL IMPORT LOGIC ---
+        async function fetchCardsFromScryfall(names) {
+            const allFoundCards = [];
+            const allNotFoundNames = [];
+            const CHUNK_SIZE = 75;
+
+            for (let i = 0; i < names.length; i += CHUNK_SIZE) {
+                const chunk = names.slice(i, i + CHUNK_SIZE);
+                showMessage(`Fetching batch ${Math.floor(i / CHUNK_SIZE) + 1}... (${i + chunk.length}/${names.length})`, false, 'scryfall');
+                const identifiers = chunk.map(name => ({ name }));
+
+                try {
+                    const response = await fetch('https://api.scryfall.com/cards/collection', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ identifiers }),
+                    });
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(`Scryfall API Error: ${errorData.details || response.statusText}`);
+                    }
+                    const result = await response.json();
+                    if (result.data) allFoundCards.push(...result.data);
+                    if (result.not_found) allNotFoundNames.push(...result.not_found.map(item => item.name));
+                } catch (error) {
+                    console.error("Error fetching chunk:", error);
+                    allNotFoundNames.push(...chunk);
+                }
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            return { found: allFoundCards, notFound: allNotFoundNames };
+        }
+
+        function processScryfallCard(card) {
+            const cardFace = card.card_faces ? card.card_faces[0] : card;
+            const [type, subtype] = (card.type_line || '').split(' — ');
+            return {
+                name: card.name,
+                type: type || '',
+                subtype: subtype || '',
+                cost: cardFace.mana_cost || '',
+                text: cardFace.oracle_text || '',
+                power: card.power || null,
+                toughness: card.toughness || null,
+                loyalty: card.loyalty || null,
+                flavourText: cardFace.flavor_text || '',
+                imageUrl: card.image_uris?.normal || cardFace.image_uris?.normal || null,
+            };
+        }
+
+        function displayResults(found, notFound) {
+            foundCardsGrid.innerHTML = '';
+            notFoundList.innerHTML = '';
+            foundCount.textContent = found.length;
+            found.forEach(cardData => {
+                const cardWrapper = document.createElement('div');
+                cardWrapper.className = 'text-center';
+                const img = document.createElement('img');
+                img.src = cardData.imageUrl || 'https://placehold.co/100x140/2d3748/e2e8f0?text=No+Image';
+                img.alt = cardData.name;
+                img.className = 'card-preview-img mx-auto';
+                const name = document.createElement('p');
+                name.textContent = cardData.name;
+                name.className = 'text-xs mt-1';
+                cardWrapper.appendChild(img);
+                cardWrapper.appendChild(name);
+                foundCardsGrid.appendChild(cardWrapper);
+            });
+
+            notFoundCount.textContent = notFound.length;
+            if (notFound.length > 0) {
+                document.getElementById('notFoundSection').classList.remove('hidden');
+                notFound.forEach(name => {
+                    const li = document.createElement('li');
+                    li.textContent = name;
+                    notFoundList.appendChild(li);
+                });
+            } else {
+                 document.getElementById('notFoundSection').classList.add('hidden');
+            }
+            resultsArea.classList.remove('hidden');
+        }
+
+        function convertToCSV(data) {
+            if (data.length === 0) return '';
+            const headers = ['Card Name', 'Card Type', 'Card Subtype', 'Mana Cost', 'Text Box', 'Flavour Text', 'Power', 'Toughness', 'Starting Loyalty', 'Image Filename', 'Commander?'];
+            const rows = data.map(card => {
+                const isLegendary = /Legendary/.test(card.type_line);
+                const isCreature = /Creature/.test(card.type_line);
+                const isCommander = isLegendary && isCreature ? 'Y' : '';
+                const values = [card.name, card.type, card.subtype, card.cost, card.text, card.flavourText, card.power, card.toughness, card.loyalty, '', isCommander];
+                return values.map(val => {
+                    const str = String(val === null || val === undefined ? '' : val);
+                    if (str.includes(',') || str.includes('"') || str.includes('\n')) return `"${str.replace(/"/g, '""')}"`;
+                    return str;
+                }).join(',');
+            });
+            return [headers.join(','), ...rows].join('\n');
+        }
+
+        function downloadCSV(csvString) {
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-s8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'scryfall_import.csv');
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        async function handleFetchClick() {
+            const inputText = cardListInput.value.trim();
+            if (!inputText) {
+                showMessage('Please enter at least one card name.', true, 'scryfall');
+                return;
+            }
+
+            fetchBtn.disabled = true;
+            fetchBtn.textContent = 'Fetching...';
+            statusArea.innerHTML = '';
+            resultsArea.classList.add('hidden');
+            downloadCsvBtn.disabled = true;
+            addDirectlyBtn.disabled = true;
+            fetchedCardsData = [];
+
+            const names = [...new Set(inputText.split('\n').map(name => name.trim()).filter(Boolean))];
+
+            try {
+                const { found, notFound } = await fetchCardsFromScryfall(names);
+                fetchedCardsData = found.map(processScryfallCard);
+                displayResults(fetchedCardsData, notFound);
+                showMessage('Fetch complete!', false, 'scryfall');
+                if (fetchedCardsData.length > 0) {
+                    downloadCsvBtn.disabled = false;
+                    addDirectlyBtn.disabled = false;
+                }
+            } catch (error) {
+                console.error("An error occurred during the fetch process:", error);
+                showMessage('An unexpected error occurred. Check the console for details.', true, 'scryfall');
+            } finally {
+                fetchBtn.disabled = false;
+                fetchBtn.textContent = 'Fetch Card Data';
+            }
+        }
+
+        async function handleAddDirectly() {
+            addDirectlyBtn.disabled = true;
+            addDirectlyBtn.textContent = 'Adding...';
+
+            const cardsToCreate = [];
+            let skippedCount = 0;
+            const existingCardNames = new Set(allCards.map(c => c.name.toLowerCase()));
+
+            for (const cardData of fetchedCardsData) {
+                const lowerCaseCardName = cardData.name.toLowerCase();
+                 if (!isBasicLand(cardData.name, cardData.type) && existingCardNames.has(lowerCaseCardName)) {
+                    skippedCount++;
+                    continue; 
+                }
+                cardsToCreate.push(cardData);
+                existingCardNames.add(lowerCaseCardName); // Add to set to prevent duplicates within the same import
+            }
+
+            if (cardsToCreate.length > 0) {
+                try {
+                    const batch = db.batch();
+                    cardsToCreate.forEach(cardData => {
+                        const docRef = db.collection('cards').doc();
+                        batch.set(docRef, cardData);
+                    });
+                    await batch.commit();
+                    
+                    let successMessage = `Successfully added ${cardsToCreate.length} new cards to your collection!`;
+                    if (skippedCount > 0) successMessage += ` Skipped ${skippedCount} duplicate cards.`;
+                    showMessage(successMessage, false, 'scryfall');
+
+                    await loadAllCardsFromFirebase(); // Refresh the main collection view
+                } catch (error) {
+                    console.error("Error saving cards to Firestore:", error);
+                    showMessage("An error occurred while saving new cards.", true, 'scryfall');
+                }
+            } else {
+                let message = "No new cards were added.";
+                if (skippedCount > 0) message += ` All ${skippedCount} fetched cards were already in your collection.`
+                showMessage(message, false, 'scryfall');
+            }
+
+            addDirectlyBtn.textContent = 'Add to My Collection';
+        }
 
         // --- INITIALIZATION ---
         async function init() {
@@ -926,40 +1169,39 @@
                 myUserId = user.uid;
                 console.log("DEBUG: User signed in anonymously with UID:", myUserId);
 
+                // Main App Listeners
                 saveCardBtn.addEventListener('click', handleSaveCard);
                 cancelEditBtn.addEventListener('click', resetForm);
                 saveDeckBtn.addEventListener('click', handleSaveDeck);
                 createGameBtn.addEventListener('click', handleCreateGame);
                 joinGameBtn.addEventListener('click', handleJoinGame);
-                
-                const importTabContent = document.getElementById('tab-content-import');
-                if (importTabContent) {
-                    importTabContent.addEventListener('click', (event) => {
-                        if (event.target.id === 'importCsvBtn') {
-                            handleCsvImport();
-                        }
-                    });
-                    console.log('DEBUG: Click listener for import tab content ADDED.');
-                } else {
-                    console.error('DEBUG: Import tab content not found.');
-                }
-
                 copyLinkBtn.addEventListener('click', handleCopyLink);
+                
+                // CSV Importer Listeners
                 document.getElementById('bulkImageUpload').addEventListener('change', handleImageUpload);
                 document.getElementById('csvFile').addEventListener('change', (event) => {
                     if (event.target.files && event.target.files.length > 0) {
                         csvFileToProcess = event.target.files[0];
-                        console.log('DEBUG: CSV file selected and stored:', csvFileToProcess.name);
                     }
                 });
+                importCsvBtn.addEventListener('click', handleCsvImport);
+
+                // Scryfall Importer Listeners
+                fetchBtn.addEventListener('click', handleFetchClick);
+                downloadCsvBtn.addEventListener('click', () => {
+                    const csv = convertToCSV(fetchedCardsData);
+                    downloadCSV(csv);
+                });
+                addDirectlyBtn.addEventListener('click', handleAddDirectly);
                 
+                // Initial Load
                 await loadAllCardsFromFirebase();
                 renderSavedDecks();
                 cardTypeSelect.dispatchEvent(new Event('change'));
 
             } catch (error) {
                 console.error("Authentication or Initialization failed:", error);
-                showMessage("Could not connect to the server. Please refresh the page.");
+                document.body.innerHTML = `<div class="text-red-400 p-8">Could not connect to the server. Please check the console and refresh the page. Error: ${error.message}</div>`;
             }
         }
 
