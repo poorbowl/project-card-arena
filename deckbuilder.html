@@ -507,11 +507,6 @@
 
             const colorPips = document.createElement('div');
             colorPips.className = 'flex justify-center items-center mt-1 h-4'; // h-4 gives it a fixed height
-
-            // --- START: ADD THESE TWO LINES FOR DEBUGGING ---
-            const manaHtml = parseManaCost(card.cost, 'mana-symbol');
-            console.log(`For card "${card.name}", generated mana HTML:`, manaHtml); 
-            // --- END: ADD THESE TWO LINES FOR DEBUGGING ---
             
             colorPips.innerHTML = parseManaCost(card.cost, 'mana-symbol');
             infoDiv.appendChild(colorPips);
