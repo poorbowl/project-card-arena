@@ -450,6 +450,32 @@
         };
 
         // --- RENDER FUNCTIONS ---
+        // NEW (Corrected): This function parses a mana cost string and returns HTML for the symbols.
+        const parseManaCost = (cost, symbolClass = '') => {
+            if (!cost) return '';
+
+            const manaSymbols = {
+                'W': 'data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ccircle cx=%2750%27 cy=%2750%27 r=%2748%27 fill=%27%23F8F6D8%27 stroke=%27black%27 stroke-width=%274%27/%3E%3Cpath d=%27M50 15 L60 35 L75 25 L65 45 L85 50 L65 55 L75 75 L60 65 L50 85 L40 65 L25 75 L35 55 L15 50 L35 45 L25 25 L40 35 Z%27 fill=%27%23D4C28C%27/%3E%3C/svg%3E',
+                'U': 'data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ccircle cx=%2750%27 cy=%2750%27 r=%2748%27 fill=%27%23C1D7E9%27 stroke=%27black%27 stroke-width=%274%27/%3E%3Cpath d=%27M50 20 Q30 40 50 80 Q70 40 50 20 M50 25 Q65 40 50 75 Q35 40 50 25%27 fill=%27%230E68AB%27/%3E%3C/svg%3E',
+                'B': 'data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ccircle cx=%2750%27 cy=%2750%27 r=%2748%27 fill=%27%23BCB3B1%27 stroke=%27black%27 stroke-width=%274%27/%3E%3Cpath d=%27M50,25 C65,30 70,45 70,50 C70,65 55,70 50,75 C45,70 30,65 30,50 C30,45 35,30 50,25 M50,30 C40,35 35,45 35,50 C35,60 45,65 50,70 C55,65 65,60 65,50 C65,45 60,35 50,30%27 fill=%27%23150B00%27/%3E%3C/svg%3E',
+                'R': 'data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ccircle cx=%2750%27 cy=%2750%27 r=%2748%27 fill=%27%23E9A283%27 stroke=%27black%27 stroke-width=%274%27/%3E%3Cpath d=%27M50 15 L 85 50 L 50 85 L 15 50 Z M 50 25 L 75 50 L 50 75 L 25 50 Z%27 fill=%27%23D3202A%27/%3E%3C/svg%3E',
+                'G': 'data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ccircle cx=%2750%27 cy=%2750%27 r=%2748%27 fill=%27%23C4D3C4%27 stroke=%27black%27 stroke-width=%274%27/%3E%3Cpath d=%27M50 15 C 70 35, 70 65, 50 85 C 30 65, 30 35, 50 15 M 50 25 C 65 40, 65 60, 50 75 C 35 60, 35 40, 50 25%27 fill=%27%2300733E%27/%3E%3C/svg%3E',
+            };
+
+            let html = '';
+            const symbols = cost.match(/\{(.+?)\}/g) || [];
+            symbols.forEach(symbol => {
+                const key = symbol.replace(/\{|\}/g, '');
+                if (manaSymbols[key]) {
+                    // This line now includes the style directly
+                    html += `<img src="${manaSymbols[key]}" class="${symbolClass}" alt="${key}" style="width: 16px; height: 16px; vertical-align: middle;">`;
+                } else {
+                    // This line now includes the style directly
+                    html += `<span class="inline-flex items-center justify-center bg-gray-500 rounded-full text-xs font-bold ${symbolClass}" style="width: 16px; height: 16px; vertical-align: middle;">${key}</span>`;
+                }
+            });
+            return html;
+        };
         const renderCard = (card, container) => {
             const cardWrapper = document.createElement('div');
             cardWrapper.className = 'p-2 bg-gray-700 rounded-lg flex flex-col items-center justify-between';
@@ -480,13 +506,14 @@
             infoDiv.appendChild(typeText);
 
             const colorPips = document.createElement('div');
-            colorPips.className = 'flex justify-center mt-1';
-            const colors = getCardColorIdentity(card.cost);
-            colors.forEach(color => {
-                const pip = document.createElement('span');
-                pip.className = `color-pip pip-${color}`;
-                colorPips.appendChild(pip);
-            });
+            colorPips.className = 'flex justify-center items-center mt-1 h-4'; // h-4 gives it a fixed height
+
+            // --- START: ADD THESE TWO LINES FOR DEBUGGING ---
+            const manaHtml = parseManaCost(card.cost, 'mana-symbol');
+            console.log(`For card "${card.name}", generated mana HTML:`, manaHtml); 
+            // --- END: ADD THESE TWO LINES FOR DEBUGGING ---
+            
+            colorPips.innerHTML = parseManaCost(card.cost, 'mana-symbol');
             infoDiv.appendChild(colorPips);
 
             const buttonBar = document.createElement('div');
