@@ -195,6 +195,26 @@
     <div class="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div class="lg:col-span-2">
             <h2 class="text-2xl font-semibold mb-4">My Card Collection</h2>
+            
+            <!-- NEW: Filter and Sort Controls -->
+            <div class="bg-gray-900 p-4 rounded-lg mb-4 flex flex-wrap gap-4 items-center">
+                <input type="text" id="filterName" placeholder="Filter by name..." class="flex-grow bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 min-w-[200px]">
+                <select id="filterType" class="bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    <option value="">All Types</option>
+                    <option>Creature</option>
+                    <option>Planeswalker</option>
+                    <option>Sorcery</option>
+                    <option>Instant</option>
+                    <option>Enchantment</option>
+                    <option>Artifact</option>
+                    <option>Land</option>
+                </select>
+                <select id="filterSort" class="bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    <option value="name_asc">Sort: Name (A-Z)</option>
+                    <option value="name_desc">Sort: Name (Z-A)</option>
+                </select>
+            </div>
+
             <div id="cardCollection" class="bg-gray-900 p-4 rounded-lg min-h-[300px] grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"></div>
         </div>
         <div>
@@ -305,6 +325,11 @@
         const downloadCsvBtn = document.getElementById('downloadCsvBtn');
         const addDirectlyBtn = document.getElementById('addDirectlyBtn');
 
+        // --- DOM Elements (Collection Management) ---
+        const filterNameInput = document.getElementById('filterName');
+        const filterTypeSelect = document.getElementById('filterType');
+        const filterSortSelect = document.getElementById('filterSort');
+
         // --- Global State ---
         let allCards = [];
         let currentDeck = [];
@@ -409,9 +434,45 @@
             container.appendChild(cardWrapper);
         };
 
-        const renderCollection = () => {
+        /**
+         * NEW: This is the master function for rendering the card collection.
+         * It applies filters and sorting before displaying the cards.
+         */
+        const renderFilteredCollection = () => {
+            let filteredCards = [...allCards]; // Start with a copy of all cards
+
+            // 1. Filter by name (case-insensitive)
+            const nameQuery = filterNameInput.value.toLowerCase();
+            if (nameQuery) {
+                filteredCards = filteredCards.filter(card => card.name.toLowerCase().includes(nameQuery));
+            }
+
+            // 2. Filter by card type
+            const typeQuery = filterTypeSelect.value;
+            if (typeQuery) {
+                filteredCards = filteredCards.filter(card => card.type === typeQuery);
+            }
+
+            // 3. Sort the results based on the selected option
+            const sortQuery = filterSortSelect.value;
+            if (sortQuery === 'name_asc') {
+                filteredCards.sort((a, b) => a.name.localeCompare(b.name));
+            } else if (sortQuery === 'name_desc') {
+                filteredCards.sort((a, b) => b.name.localeCompare(a.name));
+            }
+
+            // 4. Clear the existing collection and render the final list
             cardCollectionEl.innerHTML = '';
-            allCards.forEach(card => renderCard(card, cardCollectionEl));
+            filteredCards.forEach(card => renderCard(card, cardCollectionEl));
+        };
+
+        /**
+         * MODIFIED: This function now just calls the new master rendering function.
+         * This ensures that any time the collection is supposed to be refreshed,
+         * the filters and sorting are automatically applied.
+         */
+        const renderCollection = () => {
+            renderFilteredCollection();
         };
         
         const renderDeckList = () => {
@@ -495,7 +556,7 @@
             try {
                 const snapshot = await db.collection('cards').get();
                 allCards = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                allCards.sort((a, b) => a.name.localeCompare(b.name));
+                // MODIFIED: Sorting is now handled by renderFilteredCollection, so we remove it from here.
                 renderCollection();
                 console.log(`Loaded ${allCards.length} cards from Firestore.`);
             } catch (error) {
@@ -583,7 +644,7 @@
                     showMessage(`Success: "${name}" was added.`, false);
                 }
                 
-                allCards.sort((a, b) => a.name.localeCompare(b.name));
+                // MODIFIED: Sorting is now handled by renderFilteredCollection
                 renderCollection();
                 resetForm();
 
@@ -1193,6 +1254,11 @@
                     downloadCSV(csv);
                 });
                 addDirectlyBtn.addEventListener('click', handleAddDirectly);
+
+                // NEW: Collection Filter Listeners
+                filterNameInput.addEventListener('input', renderFilteredCollection);
+                filterTypeSelect.addEventListener('change', renderFilteredCollection);
+                filterSortSelect.addEventListener('change', renderFilteredCollection);
                 
                 // Initial Load
                 await loadAllCardsFromFirebase();
