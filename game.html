@@ -1753,7 +1753,9 @@
                                     
                                     if (pendingData) {
                                     // This is the complete, final version for joining players
-                                    shuffle(pendingData.deck); // Shuffles the deck
+                                    // Create a deep copy to ensure unique card instances, and shuffles the deck
+                                    const deck = JSON.parse(JSON.stringify(pendingData.deck));
+                                    shuffle(deck);
                                     
                                     pendingData.deck.forEach(card => {
                                         card.instanceId = `card-${Date.now()}-${Math.random()}`;
@@ -1769,7 +1771,7 @@
                                         uid: myUserId, 
                                         name: pendingData.playerName, 
                                         life: startingLife, 
-                                        deck: pendingData.deck, 
+                                        deck: deck, 
                                         hand: [], 
                                         battlefield: [], 
                                         graveyard:[], 
@@ -1793,7 +1795,7 @@
                             const p1 = currentGameState.players.p1;
                              if (localPlayerId === 'p1' && p1) {
                                  if (p1.deck && !p1.shuffled) {
-                                     const deck = p1.deck || [];
+                                     const deck = JSON.parse(JSON.stringify(p1.deck || []));
                                      shuffle(deck);
 
                                     // ADD THIS SNIPPET HERE
