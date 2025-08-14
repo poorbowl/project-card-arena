@@ -1422,46 +1422,57 @@
         // --- INITIALIZATION ---
         async function init() {
             try {
-                const { user } = await firebase.auth().signInAnonymously();
-                myUserId = user.uid;
+                firebase.auth().onAuthStateChanged(async (user) => {
+    if (user) {
+        // User is signed in.
+        myUserId = user.uid;
+        console.log("DEBUG: User signed in with UID:", myUserId);
+
+        // All the original setup code will now run *after* we confirm the user is logged in.
+        // Main App Listeners
+        saveCardBtn.addEventListener('click', handleSaveCard);
+        cancelEditBtn.addEventListener('click', resetForm);
+        saveDeckBtn.addEventListener('click', handleSaveDeck);
+        createGameBtn.addEventListener('click', handleCreateGame);
+        joinGameBtn.addEventListener('click', handleJoinGame);
+        copyLinkBtn.addEventListener('click', handleCopyLink);
+
+        // CSV Importer Listeners
+        document.getElementById('bulkImageUpload').addEventListener('change', handleImageUpload);
+        document.getElementById('csvFile').addEventListener('change', (event) => {
+            if (event.target.files && event.target.files.length > 0) {
+                csvFileToProcess = event.target.files[0];
+            }
+        });
+        importCsvBtn.addEventListener('click', handleCsvImport);
+
+        // Scryfall Importer Listeners
+        fetchBtn.addEventListener('click', handleFetchClick);
+        downloadCsvBtn.addEventListener('click', () => {
+            const csv = convertToCSV(fetchedCardsData);
+            downloadCSV(csv);
+        });
+        addDirectlyBtn.addEventListener('click', handleAddDirectly);
+
+        // Collection Filter Listeners
+        filterNameInput.addEventListener('input', renderFilteredCollection);
+        filterTypeSelect.addEventListener('change', renderFilteredCollection);
+        filterSortSelect.addEventListener('change', renderFilteredCollection);
+        filterColorSelect.addEventListener('change', renderFilteredCollection);
+        filterSourceSelect.addEventListener('change', renderFilteredCollection);
+
+        // Initial Load
+        await loadAllCardsFromFirebase();
+        renderSavedDecks();
+        cardTypeSelect.dispatchEvent(new Event('change'));
+
+    } else {
+        // No user is signed in. Redirect to the login page.
+        window.location.href = 'index.html';
+    }
+});
                 console.log("DEBUG: User signed in anonymously with UID:", myUserId);
 
-                // Main App Listeners
-                saveCardBtn.addEventListener('click', handleSaveCard);
-                cancelEditBtn.addEventListener('click', resetForm);
-                saveDeckBtn.addEventListener('click', handleSaveDeck);
-                createGameBtn.addEventListener('click', handleCreateGame);
-                joinGameBtn.addEventListener('click', handleJoinGame);
-                copyLinkBtn.addEventListener('click', handleCopyLink);
-                
-                // CSV Importer Listeners
-                document.getElementById('bulkImageUpload').addEventListener('change', handleImageUpload);
-                document.getElementById('csvFile').addEventListener('change', (event) => {
-                    if (event.target.files && event.target.files.length > 0) {
-                        csvFileToProcess = event.target.files[0];
-                    }
-                });
-                importCsvBtn.addEventListener('click', handleCsvImport);
-
-                // Scryfall Importer Listeners
-                fetchBtn.addEventListener('click', handleFetchClick);
-                downloadCsvBtn.addEventListener('click', () => {
-                    const csv = convertToCSV(fetchedCardsData);
-                    downloadCSV(csv);
-                });
-                addDirectlyBtn.addEventListener('click', handleAddDirectly);
-
-                // Collection Filter Listeners
-                filterNameInput.addEventListener('input', renderFilteredCollection);
-                filterTypeSelect.addEventListener('change', renderFilteredCollection);
-                filterSortSelect.addEventListener('change', renderFilteredCollection);
-                filterColorSelect.addEventListener('change', renderFilteredCollection);
-                filterSourceSelect.addEventListener('change', renderFilteredCollection);
-                
-                // Initial Load
-                await loadAllCardsFromFirebase();
-                renderSavedDecks();
-                cardTypeSelect.dispatchEvent(new Event('change'));
 
             } catch (error) {
                 console.error("Authentication or Initialization failed:", error);
