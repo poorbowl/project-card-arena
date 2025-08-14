@@ -4,6 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Project Card Arena - Main Menu</title>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <!-- Our Firebase Initialization -->
+    <script src="firebase-init.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -33,52 +41,183 @@
         <h1 class="text-4xl font-bold text-center mb-2 text-indigo-400">Project Card Arena</h1>
         <p class="text-center text-gray-400 mb-8">Your Digital Tabletop Sandbox</p>
 
-        <!-- Create Game Section -->
-        <div class="mb-8">
-            <a href="deckbuilder.html" class="btn btn-primary block text-center">
-                Create New Game & Build Deck
-            </a>
-        </div>
-
-        <div class="relative my-6">
-            <div class="absolute inset-0 flex items-center" aria-hidden="true">
-                <div class="w-full border-t border-gray-700"></div>
+        <!-- This container will be hidden after login -->
+        <div id="auth-container">
+            <div class="mb-4 border-b border-gray-700">
+                <nav class="flex -mb-px" aria-label="Tabs">
+                    <button id="login-tab" class="w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm text-indigo-400 border-indigo-500">
+                        Sign In
+                    </button>
+                    <button id="signup-tab" class="w-1/2 py-4 px-1 text-center border-b-2 border-transparent font-medium text-sm text-gray-400 hover:text-gray-200 hover:border-gray-500">
+                        Create Account
+                    </button>
+                </nav>
             </div>
-            <div class="relative flex justify-center">
-                <span class="bg-gray-900 px-2 text-sm text-gray-500">OR</span>
-            </div>
-        </div>
 
-        <!-- Join Game Section -->
-        <div>
-            <h2 class="text-xl font-semibold text-center mb-4">Join an Existing Game</h2>
-            <div class="space-y-4">
+            <!-- Login Form -->
+            <div id="login-form" class="space-y-4">
                 <div>
-                    <label for="gameIdInput" class="sr-only">Game ID</label>
-                    <input type="text" id="gameIdInput" placeholder="Enter Game ID..." class="input-field text-center">
+                    <label for="login-email" class="sr-only">Email</label>
+                    <input type="email" id="login-email" placeholder="Email Address" class="input-field">
                 </div>
-                <button id="joinGameBtn" class="btn btn-secondary">Join Game</button>
+                <div>
+                    <label for="login-password" class="sr-only">Password</label>
+                    <input type="password" id="login-password" placeholder="Password" class="input-field">
+                </div>
+                <button id="login-btn" class="btn btn-primary">Sign In</button>
             </div>
-            <p id="error-message" class="text-red-400 text-sm text-center mt-4 hidden"></p>
+
+            <!-- Signup Form (hidden by default) -->
+            <div id="signup-form" class="space-y-4 hidden">
+                <div>
+                    <label for="signup-email" class="sr-only">Email</label>
+                    <input type="email" id="signup-email" placeholder="Email Address" class="input-field">
+                </div>
+                <div>
+                    <label for="signup-password" class="sr-only">Password</label>
+                    <input type="password" id="signup-password" placeholder="Password (6+ characters)" class="input-field">
+                </div>
+                <button id="signup-btn" class="btn btn-primary">Create Account</button>
+            </div>
+            <p id="auth-error-message" class="text-red-400 text-sm text-center mt-4 hidden"></p>
+        </div>
+
+        <!-- This container is hidden until the user logs in -->
+        <div id="main-menu-container" class="hidden">
+            <div class="text-center mb-6">
+                <p>Welcome, <span id="user-email" class="font-bold text-indigo-300"></span>!</p>
+                <button id="logout-btn" class="text-sm text-gray-400 hover:text-white underline">Sign Out</button>
+            </div>
+            <!-- Create Game Section -->
+            <div class="mb-8">
+                <a href="deckbuilder.html" class="btn btn-primary block text-center">
+                    Create New Game & Build Deck
+                </a>
+            </div>
+            <div class="relative my-6">
+                <div class="absolute inset-0 flex items-center" aria-hidden="true"><div class="w-full border-t border-gray-700"></div></div>
+                <div class="relative flex justify-center"><span class="bg-gray-900 px-2 text-sm text-gray-500">OR</span></div>
+            </div>
+            <!-- Join Game Section -->
+            <div>
+                <h2 class="text-xl font-semibold text-center mb-4">Join an Existing Game</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label for="gameIdInput" class="sr-only">Game ID</label>
+                        <input type="text" id="gameIdInput" placeholder="Enter Game ID..." class="input-field text-center">
+                    </div>
+                    <button id="joinGameBtn" class="btn btn-secondary">Join Game</button>
+                </div>
+                <p id="error-message" class="text-red-400 text-sm text-center mt-4 hidden"></p>
+            </div>
         </div>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            // --- Get all the new elements ---
+            const authContainer = document.getElementById('auth-container');
+            const mainMenuContainer = document.getElementById('main-menu-container');
+            const userEmailEl = document.getElementById('user-email');
+            
+            const loginTab = document.getElementById('login-tab');
+            const signupTab = document.getElementById('signup-tab');
+            const loginForm = document.getElementById('login-form');
+            const signupForm = document.getElementById('signup-form');
+
+            const loginBtn = document.getElementById('login-btn');
+            const signupBtn = document.getElementById('signup-btn');
+            const logoutBtn = document.getElementById('logout-btn');
+            
+            const loginEmailInput = document.getElementById('login-email');
+            const loginPasswordInput = document.getElementById('login-password');
+            const signupEmailInput = document.getElementById('signup-email');
+            const signupPasswordInput = document.getElementById('signup-password');
+            
+            const authErrorMessageEl = document.getElementById('auth-error-message');
+            
+            // --- Original menu elements ---
             const joinGameBtn = document.getElementById('joinGameBtn');
             const gameIdInput = document.getElementById('gameIdInput');
             const errorMessageEl = document.getElementById('error-message');
 
+            // --- Function to switch between login and signup tabs ---
+            const showLoginTab = () => {
+                loginTab.classList.add('text-indigo-400', 'border-indigo-500');
+                loginTab.classList.remove('text-gray-400', 'border-transparent', 'hover:text-gray-200', 'hover:border-gray-500');
+                signupTab.classList.add('text-gray-400', 'border-transparent', 'hover:text-gray-200', 'hover:border-gray-500');
+                signupTab.classList.remove('text-indigo-400', 'border-indigo-500');
+                loginForm.classList.remove('hidden');
+                signupForm.classList.add('hidden');
+                authErrorMessageEl.classList.add('hidden');
+            };
+
+            const showSignupTab = () => {
+                signupTab.classList.add('text-indigo-400', 'border-indigo-500');
+                signupTab.classList.remove('text-gray-400', 'border-transparent', 'hover:text-gray-200', 'hover:border-gray-500');
+                loginTab.classList.add('text-gray-400', 'border-transparent', 'hover:text-gray-200', 'hover:border-gray-500');
+                loginTab.classList.remove('text-indigo-400', 'border-indigo-500');
+                signupForm.classList.remove('hidden');
+                loginForm.classList.add('hidden');
+                authErrorMessageEl.classList.add('hidden');
+            };
+            
+            // --- Function to update the UI based on login state ---
+            const updateUI = (user) => {
+                if (user) {
+                    // User is signed in
+                    authContainer.classList.add('hidden');
+                    mainMenuContainer.classList.remove('hidden');
+                    userEmailEl.textContent = user.email;
+                } else {
+                    // User is signed out
+                    mainMenuContainer.classList.add('hidden');
+                    authContainer.classList.remove('hidden');
+                    showLoginTab(); // Default to login tab
+                }
+            };
+
+            // --- Firebase Auth Logic ---
+            firebase.auth().onAuthStateChanged(user => {
+                updateUI(user);
+            });
+
+            loginBtn.addEventListener('click', () => {
+                const email = loginEmailInput.value;
+                const password = loginPasswordInput.value;
+                firebase.auth().signInWithEmailAndPassword(email, password)
+                    .catch(error => {
+                        authErrorMessageEl.textContent = error.message;
+                        authErrorMessageEl.classList.remove('hidden');
+                    });
+            });
+
+            signupBtn.addEventListener('click', () => {
+                const email = signupEmailInput.value;
+                const password = signupPasswordInput.value;
+                firebase.auth().createUserWithEmailAndPassword(email, password)
+                    .catch(error => {
+                        authErrorMessageEl.textContent = error.message;
+                        authErrorMessageEl.classList.remove('hidden');
+                    });
+            });
+            
+            logoutBtn.addEventListener('click', () => {
+                firebase.auth().signOut();
+            });
+
+            // --- Tab Switching Logic ---
+            loginTab.addEventListener('click', showLoginTab);
+            signupTab.addEventListener('click', showSignupTab);
+
+            // --- Original Join Game Logic ---
             const handleJoinGame = () => {
                 const gameId = gameIdInput.value.trim();
-                
                 if (!gameId) {
                     errorMessageEl.textContent = 'Please enter a Game ID.';
                     errorMessageEl.classList.remove('hidden');
                     return;
                 }
-                
-                // If the user pastes a full URL, extract the ID
                 if (gameId.includes('?gameId=')) {
                     try {
                         const url = new URL(gameId);
@@ -93,14 +232,11 @@
                         errorMessageEl.classList.remove('hidden');
                     }
                 } else {
-                    // Assume it's just the ID
                     window.location.href = `game.html?gameId=${gameId}`;
                 }
             };
 
             joinGameBtn.addEventListener('click', handleJoinGame);
-
-            // Allow pressing Enter to join
             gameIdInput.addEventListener('keydown', (event) => {
                 if (event.key === 'Enter') {
                     handleJoinGame();
