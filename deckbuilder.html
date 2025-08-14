@@ -35,21 +35,28 @@
             color: #a5b4fc;
             font-weight: bold;
         }
-        /* NEW: Styles for the card pop-out */
+        /* NEW: Styles for the detailed card pop-out */
         #card-popout {
             position: fixed;
-            display: none;
-            z-index: 100;
-            pointer-events: none; /* Allows mouse events to pass through */
-            border-radius: 12px;
-            overflow: hidden;
-            border: 2px solid #4f46e5;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            width: 280px;
+            background-color: #1f2937;
+            border: 1px solid #4f46e5;
+            z-index: 9000;
+            color: white;
+            display: none; /* This keeps it hidden initially */
+            pointer-events: none; /* This is crucial so the pop-out doesn't interfere with mouse events */
         }
-        #card-popout img {
-            width: 250px;
-            height: 350px;
-            display: block;
+        #popout-img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            background-color: #374151;
+        }
+        #popout-flavour {
+            font-style: italic;
+            border-top: 1px solid #4b5563;
+            padding-top: 8px;
+            margin-top: 8px;
         }
         /* NEW: Styles for color pips */
         .color-pip {
@@ -332,9 +339,19 @@
 
     </div>
 
-    <!-- NEW: Pop-out element for card previews -->
-    <div id="card-popout">
-        <img id="popout-card-image" src="" alt="Card Preview">
+    <!-- updated: Pop-out element for card previews -->
+    <div id="card-popout" class="rounded-lg shadow-2xl p-2 space-y-2">
+        <div class="flex justify-between items-start">
+            <span id="popout-name" class="font-bold"></span>
+            <span id="popout-cost" class="text-sm flex gap-1 items-center"></span>
+        </div>
+        <img id="popout-img" src="" alt="Card Image" class="rounded-md">
+        <div class="flex justify-between items-center text-sm">
+            <span id="popout-type" class="font-semibold"></span>
+            <span id="popout-pt" class="font-bold"></span>
+        </div>
+        <div id="popout-text" class="text-xs bg-gray-800 p-2 rounded-md whitespace-pre-wrap max-h-40 overflow-y-auto"></div>
+        <div id="popout-flavour" class="text-xs text-gray-400 italic"></div>
     </div>
 
     <script>
@@ -386,8 +403,13 @@
         
         // --- DOM Elements (Pop-out) ---
         const cardPopoutEl = document.getElementById('card-popout');
-        const popoutCardImageEl = document.getElementById('popout-card-image');
-
+        const popoutNameEl = document.getElementById('popout-name');
+        const popoutCostEl = document.getElementById('popout-cost');
+        const popoutImgEl = document.getElementById('popout-img');
+        const popoutTypeEl = document.getElementById('popout-type');
+        const popoutPtEl = document.getElementById('popout-pt');
+        const popoutTextEl = document.getElementById('popout-text');
+        const popoutFlavourEl = document.getElementById('popout-flavour');
 
         // --- Global State ---
         let allCards = [];
@@ -476,6 +498,67 @@
             });
             return html;
         };
+    // NEW: Functions to control the card pop-out
+        function showCardPopout(event, cardData) {
+            if (cardData) {
+                // Populate the popout elements with data
+                popoutNameEl.textContent = cardData.name;
+                popoutCostEl.innerHTML = parseManaCost(cardData.cost, 'mana-symbol-cost');
+                popoutImgEl.src = cardData.imageUrl || 'https://placehold.co/280x200/2d3748/e2e8f0?text=No+Image';
+                
+                let typeLine = cardData.type || '';
+                if (cardData.subtype) {
+                    typeLine += ` — ${cardData.subtype}`;
+                }
+                popoutTypeEl.textContent = typeLine;
+                
+                popoutTextEl.innerHTML = (cardData.text || '').replace(/\n/g, '<br>');
+                
+                if (cardData.flavourText) {
+                    popoutFlavourEl.innerHTML = (cardData.flavourText || '').replace(/\n/g, '<br>');
+                    popoutFlavourEl.style.display = 'block';
+                } else {
+                    popoutFlavourEl.style.display = 'none';
+                }
+                
+                if (cardData.power && cardData.toughness) {
+                    popoutPtEl.textContent = `${cardData.power}/${cardData.toughness}`;
+                } else if (cardData.loyalty) {
+                    popoutPtEl.textContent = `Loyalty: ${cardData.loyalty}`;
+                } else {
+                    popoutPtEl.textContent = '';
+                }
+
+                cardPopoutEl.style.display = 'block';
+            }
+        }
+
+        function hideCardPopout() {
+            cardPopoutEl.style.display = 'none';
+        }
+
+        function moveCardPopout(event) {
+            const popoutHeight = cardPopoutEl.offsetHeight;
+            const popoutWidth = cardPopoutEl.offsetWidth;
+            const buffer = 20;
+
+            let top = event.clientY + buffer;
+            let left = event.clientX + buffer;
+
+            // Logic to keep the popout on the screen
+            if (top + popoutHeight > window.innerHeight) {
+                top = event.clientY - popoutHeight - buffer;
+            }
+            if (top < 0) {
+                top = buffer;
+            }
+            if (left + popoutWidth > window.innerWidth) {
+                left = event.clientX - popoutWidth - buffer;
+            }
+
+            cardPopoutEl.style.left = `${left}px`;
+            cardPopoutEl.style.top = `${top}px`;
+        }
         const renderCard = (card, container) => {
             const cardWrapper = document.createElement('div');
             cardWrapper.className = 'p-2 bg-gray-700 rounded-lg flex flex-col items-center justify-between';
@@ -531,17 +614,12 @@
             cardWrapper.appendChild(infoDiv);
             cardWrapper.appendChild(buttonBar);
 
-            // NEW: Event listeners for the pop-out
-            cardWrapper.addEventListener('mouseenter', () => {
-                popoutCardImageEl.src = card.imageUrl || 'https://placehold.co/250x350/2d3748/e2e8f0?text=No+Image';
-                cardPopoutEl.style.display = 'block';
-            });
-            cardWrapper.addEventListener('mouseleave', () => {
-                cardPopoutEl.style.display = 'none';
-            });
-
+            // modified: Event listeners for the pop-out
+            cardWrapper.addEventListener('mouseenter', (e) => showCardPopout(e, card));
+            cardWrapper.addEventListener('mouseleave', hideCardPopout);
+            cardWrapper.addEventListener('mousemove', moveCardPopout);
             container.appendChild(cardWrapper);
-        };
+            };
 
         /**
          * Helper function to determine a card's color identity from its mana cost.
@@ -1414,5 +1492,19 @@
 
         init();
     </script>
+    <!-- NEW: Pop-out element for detailed card previews -->
+    <div id="card-popout" class="rounded-lg shadow-2xl p-2 space-y-2">
+        <div class="flex justify-between items-start">
+            <span id="popout-name" class="font-bold"></span>
+            <span id="popout-cost" class="text-sm flex gap-1 items-center"></span>
+        </div>
+        <img id="popout-img" src="" alt="Card Image" class="rounded-md">
+        <div class="flex justify-between items-center text-sm">
+            <span id="popout-type" class="font-semibold"></span>
+            <span id="popout-pt" class="font-bold"></span>
+        </div>
+        <div id="popout-text" class="text-xs bg-gray-800 p-2 rounded-md whitespace-pre-wrap max-h-40 overflow-y-auto"></div>
+        <div id="popout-flavour" class="text-xs text-gray-400 italic"></div>
+    </div>
 </body>
 </html>
