@@ -1471,13 +1471,6 @@
                 filterSortSelect.addEventListener('change', renderFilteredCollection);
                 filterColorSelect.addEventListener('change', renderFilteredCollection);
                 filterSourceSelect.addEventListener('change', renderFilteredCollection);
-
-                // NEW: Mousemove listener for the pop-out position
-                document.addEventListener('mousemove', (e) => {
-                    // Position the popout slightly to the right and below the cursor
-                    cardPopoutEl.style.left = (e.pageX + 20) + 'px';
-                    cardPopoutEl.style.top = (e.pageY + 20) + 'px';
-                });
                 
                 // Initial Load
                 await loadAllCardsFromFirebase();
