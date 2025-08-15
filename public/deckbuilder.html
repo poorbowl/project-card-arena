@@ -1261,6 +1261,24 @@
             }
         };
 
+        const handleAddSelectedToDeck = () => {
+            if (selectedCards.size === 0) {
+                showMessage("No cards selected to add.", true);
+                return;
+            }
+
+            selectedCards.forEach(cardId => {
+                const cardToAdd = allCards.find(c => c.id === cardId);
+                if (cardToAdd) {
+                    currentDeck.push(cardToAdd);
+                }
+            });
+
+            showMessage(`Added ${selectedCards.size} cards to the deck.`, false);
+            toggleSelectMode(); // Exit select mode and re-render
+            renderDeckList(); // Update the deck list display
+        };
+
         // --- BULK IMPORT (CSV) LOGIC ---
         const handleImageUpload = async (event) => {
             const zipFile = event.target.files[0];
@@ -1640,10 +1658,7 @@
 
         deleteSelectedBtn.addEventListener('click', handleDeleteSelected);
 
-        addSelectedToDeckBtn.addEventListener('click', () => {
-            // We will add the logic for this function later
-            console.log('Add to deck button clicked');
-        });
+        addSelectedToDeckBtn.addEventListener('click', handleAddSelectedToDeck);
 
         // Initial Load
         await loadAllCardsFromFirebase();
