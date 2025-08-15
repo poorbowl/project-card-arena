@@ -1339,12 +1339,22 @@
         function openImportReviewModal(cards) {
             importReviewContent.innerHTML = ''; // Clear previous results
             importSelectedCards.clear();
+            const existingCardNames = new Set(allCards.map(c => c.name.toLowerCase()));
 
             cards.forEach(cardData => {
                 const cardWrapper = document.createElement('div');
-                // ADDED border-2 and border-transparent here
-                cardWrapper.className = 'card-wrapper p-2 bg-gray-700 rounded-lg flex flex-col items-center justify-between cursor-pointer transition-all border-2 border-transparent';
+                cardWrapper.className = 'card-wrapper p-2 bg-gray-700 rounded-lg flex flex-col items-center justify-between cursor-pointer transition-all border-2 border-transparent relative'; // Added relative positioning
                 cardWrapper.dataset.cardId = cardData.name;
+
+                // --- NEW: Check if card is already in collection ---
+                const alreadyOwned = existingCardNames.has(cardData.name.toLowerCase());
+                if (alreadyOwned) {
+                    cardWrapper.classList.add('opacity-60'); // Fade the card slightly
+                    const badge = document.createElement('span');
+                    badge.className = 'absolute top-1 right-1 bg-indigo-500 text-white text-xs font-bold px-2 py-1 rounded-full';
+                    badge.textContent = 'In Collection';
+                    cardWrapper.appendChild(badge);
+                }
 
                 const img = document.createElement('img');
                 img.src = cardData.imageUrl || 'https://placehold.co/100x140/2d3748/e2e8f0?text=No+Image';
@@ -1361,12 +1371,12 @@
                 cardWrapper.addEventListener('click', () => {
                     if (importSelectedCards.has(cardData.name)) {
                         importSelectedCards.delete(cardData.name);
+                        cardWrapper.classList.remove('border-blue-500');
                         cardWrapper.classList.add('border-transparent');
-                        cardWrapper.classList.remove('border-blue-500'); // Use border instead of ring
                     } else {
                         importSelectedCards.add(cardData.name);
                         cardWrapper.classList.remove('border-transparent');
-                        cardWrapper.classList.add('border-blue-500'); // Use border instead of ring
+                        cardWrapper.classList.add('border-blue-500');
                     }
                     importSelectionCountEl.textContent = `${importSelectedCards.size} cards selected`;
                 });
@@ -1390,19 +1400,21 @@
                 return;
             }
 
-            const cardsToImport = fetchedCardsData.filter(card => importSelectedCards.has(card.name));
+            // Filter the fetched cards to get only the ones the user selected.
+            const selectedData = fetchedCardsData.filter(card => importSelectedCards.has(card.name));
 
             const cardsToCreate = [];
             let skippedCount = 0;
             const existingCardNames = new Set(allCards.map(c => c.name.toLowerCase()));
 
-            for (const cardData of cardsToImport) {
+            // Now, filter the selected cards to find which ones are actually new.
+            for (const cardData of selectedData) {
                 if (!isBasicLand(cardData.name, cardData.type) && existingCardNames.has(cardData.name.toLowerCase())) {
                     skippedCount++;
-                    continue;
+                    continue; // Skip this card because it's already in the collection.
                 }
                 cardsToCreate.push(cardData);
-                existingCardNames.add(cardData.name.toLowerCase());
+                existingCardNames.add(cardData.name.toLowerCase()); // Add to set to prevent duplicates within the same import.
             }
 
             if (cardsToCreate.length > 0) {
@@ -1414,10 +1426,10 @@
                     });
                     await batch.commit();
 
-                    await loadAllCardsFromFirebase(); // Refresh the main collection view
+                    await loadAllCardsFromFirebase(); // Refresh the main collection view.
 
                     let successMessage = `Successfully added ${cardsToCreate.length} new cards to your collection!`;
-                    if (skippedCount > 0) successMessage += ` Skipped ${skippedCount} duplicate cards.`;
+                    if (skippedCount > 0) successMessage += ` Skipped ${skippedCount} cards you already own.`;
                     showMessage(successMessage, false, 'scryfall');
 
                 } catch (error) {
