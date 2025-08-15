@@ -409,6 +409,9 @@
         const filterSortSelect = document.getElementById('filterSort');
         const filterColorSelect = document.getElementById('filterColor');
         const filterSourceSelect = document.getElementById('filterSource');
+        const prevPageBtn = document.getElementById('prev-page-btn');
+        const nextPageBtn = document.getElementById('next-page-btn');
+        const pageInfoEl = document.getElementById('page-info');
         
         // --- DOM Elements (Pop-out) ---
         const cardPopoutEl = document.getElementById('card-popout');
@@ -429,6 +432,8 @@
         let editingCardId = null; 
         let csvFileToProcess = null;
         let fetchedCardsData = []; // To store the processed card data for CSV/direct export
+        let currentPage = 1;
+        const cardsPerPage = 20; // You can change this number to show more or fewer cards
 
         // --- TABS & FORM LOGIC ---
         const tabBtns = document.querySelectorAll('.tab-button');
@@ -634,21 +639,17 @@
         };
 
         const renderFilteredCollection = () => {
-            let filteredCards = [...allCards]; // Start with a copy of all cards
+            let filteredCards = [...allCards];
 
-            // 1. Filter by name (case-insensitive)
+            // --- All the existing filter logic stays the same ---
             const nameQuery = filterNameInput.value.toLowerCase();
             if (nameQuery) {
                 filteredCards = filteredCards.filter(card => card.name.toLowerCase().includes(nameQuery));
             }
-
-            // 2. Filter by card type
             const typeQuery = filterTypeSelect.value;
             if (typeQuery) {
                 filteredCards = filteredCards.filter(card => card.type === typeQuery);
             }
-
-            // 3. Filter by color identity
             const colorQuery = filterColorSelect.value;
             if (colorQuery) {
                 filteredCards = filteredCards.filter(card => {
@@ -656,14 +657,10 @@
                     return identity.includes(colorQuery);
                 });
             }
-
-            // 4. Filter by source
             const sourceQuery = filterSourceSelect.value;
             if (sourceQuery) {
                 filteredCards = filteredCards.filter(card => card.source === sourceQuery);
             }
-
-            // 5. Sort the results
             const sortQuery = filterSortSelect.value;
             if (sortQuery === 'name_asc') {
                 filteredCards.sort((a, b) => a.name.localeCompare(b.name));
@@ -671,8 +668,23 @@
                 filteredCards.sort((a, b) => b.name.localeCompare(a.name));
             }
 
+            // --- NEW PAGINATION LOGIC ---
+            const totalPages = Math.ceil(filteredCards.length / cardsPerPage);
+            if (currentPage > totalPages && totalPages > 0) {
+                currentPage = totalPages; // Go to last page if current page is out of bounds
+            }
+
+            const startIndex = (currentPage - 1) * cardsPerPage;
+            const endIndex = startIndex + cardsPerPage;
+            const paginatedCards = filteredCards.slice(startIndex, endIndex);
+
             cardCollectionEl.innerHTML = '';
-            filteredCards.forEach(card => renderCard(card, cardCollectionEl));
+            paginatedCards.forEach(card => renderCard(card, cardCollectionEl));
+
+            // Update pagination controls
+            pageInfoEl.textContent = `Page ${currentPage} of ${totalPages || 1}`;
+            prevPageBtn.disabled = currentPage === 1;
+            nextPageBtn.disabled = currentPage === totalPages || totalPages === 0;
         };
 
         const renderCollection = () => {
@@ -1511,6 +1523,18 @@
         filterSortSelect.addEventListener('change', renderFilteredCollection);
         filterColorSelect.addEventListener('change', renderFilteredCollection);
         filterSourceSelect.addEventListener('change', renderFilteredCollection);
+
+        // Next and Previous Page buttons for card library
+        prevPageBtn.addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                renderFilteredCollection();
+            }
+        });
+        nextPageBtn.addEventListener('click', () => {
+            currentPage++;
+            renderFilteredCollection();
+        });
 
         // Initial Load
         await loadAllCardsFromFirebase();
