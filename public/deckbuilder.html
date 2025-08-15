@@ -1341,13 +1341,14 @@
 
             cards.forEach(cardData => {
                 const cardWrapper = document.createElement('div');
-                cardWrapper.className = 'p-2 bg-gray-700 rounded-lg flex flex-col items-center justify-between cursor-pointer transition-all';
+                // THIS IS THE CORRECTED LINE: 'card-wrapper' is now part of the main class list.
+                cardWrapper.className = 'card-wrapper p-2 bg-gray-700 rounded-lg flex flex-col items-center justify-between cursor-pointer transition-all';
                 cardWrapper.dataset.cardId = cardData.name; // Use name as a temporary ID for selection
 
                 const img = document.createElement('img');
                 img.src = cardData.imageUrl || 'https://placehold.co/100x140/2d3748/e2e8f0?text=No+Image';
                 img.alt = cardData.name;
-                img.className = 'card-image-sm object-cover rounded-md mb-2 pointer-events-none'; // Disable pointer events on image
+                img.className = 'card-image-sm object-cover rounded-md mb-2 pointer-events-none';
 
                 const name = document.createElement('span');
                 name.textContent = cardData.name;
