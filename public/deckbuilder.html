@@ -270,6 +270,15 @@
             </div>
 
             <div id="cardCollection" class="bg-gray-900 p-4 rounded-lg min-h-[300px] grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"></div>
+            <div id="pagination-controls" class="flex justify-between items-center mt-4">
+                <button id="prev-page-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-600 disabled:cursor-not-allowed">
+                     &larr; Previous
+                </button>
+                <span id="page-info" class="text-gray-400 text-sm">Page 1</span>
+                <button id="next-page-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-600 disabled:cursor-not-allowed">
+                    Next &rarr;
+                </button>
+            </div>
         </div>
         <div>
             <div class="bg-gray-900 p-4 rounded-lg mb-8">
@@ -831,7 +840,7 @@
                 }
 
                 if (editingCardId) {
-                    const cardRef = db.collection('cards').doc(editingCardId);
+                    const cardRef = db.collection('users').doc(myUserId).collection('cards').doc(editingCardId);
                     await cardRef.update(cardDataToSave);
                     
                     const cardIndex = allCards.findIndex(c => c.id === editingCardId);

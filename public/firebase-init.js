@@ -6,7 +6,7 @@ const firebaseConfig = {
   authDomain: "project-card-arena.firebaseapp.com",
   databaseURL: "https://project-card-arena-default-rtdb.firebaseio.com/",
   projectId: "project-card-arena",
-  storageBucket: "project-card-arena.appspot.com",
+  storageBucket: "project-card-arena.firebasestorage.app",
   messagingSenderId: "220631442929",
   appId: "1:220631442929:web:318271a2def224b7c91050",
   measurementId: "G-7E2KPYHBZ9"
