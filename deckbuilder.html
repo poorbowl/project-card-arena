@@ -844,7 +844,8 @@
                     showMessage(`Success: "${name}" was updated.`, false);
                 } else {
                     cardDataToSave.imageUrl = imageUrl || null;
-                    const docRef = await db.collection('cards').add(cardDataToSave);
+                    // This now points to the user's private 'cards' collection
+                    const docRef = await db.collection('users').doc(myUserId).collection('cards').add(cardDataToSave);
                     allCards.push({ id: docRef.id, ...cardDataToSave });
                     showMessage(`Success: "${name}" was added.`, false);
                 }
@@ -1428,7 +1429,7 @@
                 try {
                     const batch = db.batch();
                     cardsToCreate.forEach(cardData => {
-                        const docRef = db.collection('cards').doc();
+                        const docRef = db.collection('users').doc(myUserId).collection('cards').doc();
                         batch.set(docRef, cardData);
                     });
                     await batch.commit();
