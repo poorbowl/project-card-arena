@@ -759,7 +759,7 @@
         // --- CORE LOGIC (Firebase) ---
         async function loadAllCardsFromFirebase() {
             try {
-                const snapshot = await db.collection('cards').get();
+                const snapshot = await db.collection('users').doc(myUserId).collection('cards').get();
                 allCards = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 renderCollection();
                 console.log(`Loaded ${allCards.length} cards from Firestore.`);
