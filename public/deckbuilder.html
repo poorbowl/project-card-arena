@@ -864,48 +864,56 @@
 
         const deleteCard = async (cardId) => {
             const cardToDelete = allCards.find(c => c.id === cardId);
-            if (!cardToDelete) return;
-
-            const decks = getSavedDecks();
-            const decksContainingCard = Object.entries(decks).filter(([name, deckData]) => {
-                const cardIds = deckData.cardIds || deckData;
-                return cardIds.includes(cardId);
-            }).map(([name]) => name);
-
-            let confirmMessage = `Are you sure you want to permanently delete "${cardToDelete.name}"?`;
-            if (decksContainingCard.length > 0) {
-                confirmMessage += `\n\nWarning: This card is in the following saved decks: ${decksContainingCard.join(', ')}. Deleting it will remove it from these decks.`;
-            }
-
-            if (!confirm(confirmMessage)) {
-                return;
-            }
+            if (!cardToDelete || !myUserId) return;
 
             try {
-                await db.collection('cards').doc(cardId).delete();
+                // Find all decks that contain the card to be deleted.
+                const decksRef = db.collection('users').doc(myUserId).collection('decks');
+                const querySnapshot = await decksRef.where('cardIds', 'array-contains', cardId).get();
+                
+                const decksContainingCard = [];
+                querySnapshot.forEach(doc => {
+                    decksContainingCard.push(doc.id);
+                });
 
-                // FIXED: Only try to delete the image if it's a Firebase Storage URL
+                let confirmMessage = `Are you sure you want to permanently delete "${cardToDelete.name}"?`;
+                if (decksContainingCard.length > 0) {
+                    confirmMessage += `\n\nWarning: This card is in the following saved decks: ${decksContainingCard.join(', ')}. Deleting it will remove it from these decks.`;
+                }
+
+                if (!confirm(confirmMessage)) {
+                    return;
+                }
+
+                // Delete the card image from storage if it exists
                 if (cardToDelete.imageUrl && cardToDelete.imageUrl.includes('firebasestorage.googleapis.com')) {
                     const imageRef = storage.refFromURL(cardToDelete.imageUrl);
                     await imageRef.delete();
                 }
 
-                allCards = allCards.filter(c => c.id !== cardId);
-                renderCollection();
+                // Delete the card document from the user's private collection
+                await db.collection('users').doc(myUserId).collection('cards').doc(cardId).delete();
+
+                // If the card was in any decks, remove it from them
+                if (decksContainingCard.length > 0) {
+                    const batch = db.batch();
+                    querySnapshot.forEach(doc => {
+                        const deckRef = doc.ref;
+                        const deckData = doc.data();
+                        const newCardIds = deckData.cardIds.filter(id => id !== cardId);
+                        const newCommanderIds = (deckData.commanderIds || []).filter(id => id !== cardId);
+                        batch.update(deckRef, { cardIds: newCardIds, commanderIds: newCommanderIds });
+                    });
+                    await batch.commit();
+                }
                 
+                // Update the UI
+                allCards = allCards.filter(c => c.id !== cardId);
                 currentDeck = currentDeck.filter(c => c.id !== cardId);
                 commanders = commanders.filter(c => c.id !== cardId);
+                renderCollection();
                 renderDeckList();
-
-                Object.entries(decks).forEach(([name, deckData]) => {
-                    const cardIds = deckData.cardIds || deckData;
-                    const commanderIds = deckData.commanderIds || [];
-                    const newCardIds = cardIds.filter(id => id !== cardId);
-                    const newCommanderIds = commanderIds.filter(id => id !== cardId);
-                    decks[name] = { cardIds: newCardIds, commanderIds: newCommanderIds };
-                });
-                saveDecks(decks);
-                renderSavedDecks();
+                await renderSavedDecks();
 
                 showMessage(`Successfully deleted "${cardToDelete.name}".`, false);
 
