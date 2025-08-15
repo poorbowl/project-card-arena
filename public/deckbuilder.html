@@ -387,7 +387,7 @@
         importReviewCancel, importReviewConfirm, filterNameInput, filterTypeSelect, filterSortSelect,
         filterColorSelect, filterSourceSelect, prevPageBtn, nextPageBtn, pageInfoEl, toggleSelectModeBtn,
         selectionActionBar, selectionCountEl, deleteSelectedBtn, addSelectedToDeckBtn, cardPopoutEl,
-        popoutNameEl, popoutCostEl, popoutImgEl, popoutTypeEl, popoutPtEl, popoutTextEl, popoutFlavourEl;
+        popoutNameEl, popoutCostEl, popoutImgEl, popoutTypeEl, popoutPtEl, popoutTextEl, popoutFlavourEl, importReviewAddToDeckBtn;
 
     // --- Global State ---
         let allCards = [];
@@ -1394,27 +1394,25 @@
             importSelectedCards.clear();
         }
 
-        const handleConfirmImport = async () => {
+        const handleConfirmImport = async (addToDeck = false) => {
             if (importSelectedCards.size === 0) {
-                showMessage("No cards selected to import.", true, 'scryfall');
+                showMessage("No cards selected.", true, 'scryfall');
                 return;
             }
 
-            // Filter the fetched cards to get only the ones the user selected.
             const selectedData = fetchedCardsData.filter(card => importSelectedCards.has(card.name));
 
             const cardsToCreate = [];
             let skippedCount = 0;
             const existingCardNames = new Set(allCards.map(c => c.name.toLowerCase()));
 
-            // Now, filter the selected cards to find which ones are actually new.
             for (const cardData of selectedData) {
                 if (!isBasicLand(cardData.name, cardData.type) && existingCardNames.has(cardData.name.toLowerCase())) {
                     skippedCount++;
-                    continue; // Skip this card because it's already in the collection.
+                    continue;
                 }
                 cardsToCreate.push(cardData);
-                existingCardNames.add(cardData.name.toLowerCase()); // Add to set to prevent duplicates within the same import.
+                existingCardNames.add(cardData.name.toLowerCase());
             }
 
             if (cardsToCreate.length > 0) {
@@ -1425,21 +1423,32 @@
                         batch.set(docRef, cardData);
                     });
                     await batch.commit();
-
-                    await loadAllCardsFromFirebase(); // Refresh the main collection view.
-
-                    let successMessage = `Successfully added ${cardsToCreate.length} new cards to your collection!`;
-                    if (skippedCount > 0) successMessage += ` Skipped ${skippedCount} cards you already own.`;
-                    showMessage(successMessage, false, 'scryfall');
-
+                    await loadAllCardsFromFirebase();
                 } catch (error) {
-                    console.error("Error saving imported cards to Firestore:", error);
+                    console.error("Error saving imported cards:", error);
                     showMessage("An error occurred while saving new cards.", true, 'scryfall');
+                    closeImportReviewModal();
+                    return;
                 }
+            }
+
+            // --- NEW LOGIC TO ADD TO DECK ---
+            if (addToDeck) {
+                selectedData.forEach(cardData => {
+                    // Find the full card object from our now-updated collection
+                    const cardToAdd = allCards.find(c => c.name === cardData.name);
+                    if (cardToAdd) {
+                        currentDeck.push(cardToAdd);
+                    }
+                });
+                renderDeckList();
+                let successMessage = `Added ${cardsToCreate.length} new cards to collection and ${selectedData.length} cards to deck.`;
+                if (skippedCount > 0) successMessage += ` Skipped ${skippedCount} duplicates.`;
+                showMessage(successMessage, false, 'scryfall');
             } else {
-                let message = "No new cards were added.";
-                if (skippedCount > 0) message += ` All ${skippedCount} selected cards were already in your collection.`
-                showMessage(message, false, 'scryfall');
+                let successMessage = `Successfully added ${cardsToCreate.length} new cards to your collection!`;
+                if (skippedCount > 0) successMessage += ` Skipped ${skippedCount} cards you already own.`;
+                showMessage(successMessage, false, 'scryfall');
             }
 
             closeImportReviewModal();
@@ -1710,6 +1719,7 @@
                         popoutPtEl = document.getElementById('popout-pt');
                         popoutTextEl = document.getElementById('popout-text');
                         popoutFlavourEl = document.getElementById('popout-flavour');
+                        importReviewAddToDeckBtn = document.getElementById('import-review-add-to-deck');
 
                         // --- ATTACH ALL EVENT LISTENERS ---
                         // --- TABS & FORM LOGIC ---
@@ -1774,7 +1784,8 @@
                         // --- Import Review Modal Listeners ---
                         importReviewClose.addEventListener('click', closeImportReviewModal);
                         importReviewCancel.addEventListener('click', closeImportReviewModal);
-                        importReviewConfirm.addEventListener('click', handleConfirmImport);
+                        importReviewConfirm.addEventListener('click', () => handleConfirmImport(false)); // false = only add to collection
+                        importReviewAddToDeckBtn.addEventListener('click', () => handleConfirmImport(true)); // true = add to collection AND deck
 
                         importSelectAllBtn.addEventListener('click', () => {
                             importReviewContent.querySelectorAll('.card-wrapper').forEach(wrapper => {
@@ -1843,6 +1854,7 @@
             </div>
             <div class="mt-4 flex-shrink-0 flex justify-end gap-4">
                 <button id="import-review-cancel" class="bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">Cancel</button>
+                <button id="import-review-add-to-deck" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Add to Deck</button>
                 <button id="import-review-confirm" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg">Add Selected to Collection</button>
             </div>
         </div>
