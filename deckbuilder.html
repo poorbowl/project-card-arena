@@ -723,26 +723,36 @@
             }
         };
         
-        const renderSavedDecks = () => {
+        const renderSavedDecks = async () => {
             savedDecksEl.innerHTML = '';
-            const decks = getSavedDecks();
-            for (const name in decks) {
-                const deckContainer = document.createElement('div');
-                deckContainer.className = 'flex justify-between items-center bg-gray-800 p-2 rounded';
-                
-                const loadBtn = document.createElement('button');
-                loadBtn.textContent = name;
-                loadBtn.className = 'text-left flex-grow hover:text-indigo-400';
-                loadBtn.onclick = () => loadDeck(name);
+            if (!myUserId) return; // Don't try to render if the user isn't logged in
 
-                const deleteBtn = document.createElement('button');
-                deleteBtn.textContent = 'Delete';
-                deleteBtn.className = 'bg-red-600 text-xs px-2 py-1 rounded';
-                deleteBtn.onclick = () => deleteDeck(name);
+            try {
+                // This is the core change: Fetching the collection of decks for the current user
+                const snapshot = await db.collection('users').doc(myUserId).collection('decks').get();
 
-                deckContainer.appendChild(loadBtn);
-                deckContainer.appendChild(deleteBtn);
-                savedDecksEl.appendChild(deckContainer);
+                snapshot.forEach(doc => {
+                    const deckName = doc.id; // In our new structure, the document ID is the deck name
+                    const deckContainer = document.createElement('div');
+                    deckContainer.className = 'flex justify-between items-center bg-gray-800 p-2 rounded';
+
+                    const loadBtn = document.createElement('button');
+                    loadBtn.textContent = deckName;
+                    loadBtn.className = 'text-left flex-grow hover:text-indigo-400';
+                    loadBtn.onclick = () => loadDeck(deckName, doc.data()); // Pass the data directly
+
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.textContent = 'Delete';
+                    deleteBtn.className = 'bg-red-600 text-xs px-2 py-1 rounded';
+                    deleteBtn.onclick = () => deleteDeck(deckName);
+
+                    deckContainer.appendChild(loadBtn);
+                    deckContainer.appendChild(deleteBtn);
+                    savedDecksEl.appendChild(deckContainer);
+                });
+            } catch (error) {
+                console.error("Error loading saved decks:", error);
+                showMessage("Could not load saved decks from the cloud.", true);
             }
         };
 
@@ -1030,8 +1040,6 @@
         };
 
         // --- Deck Management ---
-        const getSavedDecks = () => JSON.parse(localStorage.getItem('savedDecks')) || {};
-        const saveDecks = (decks) => localStorage.setItem('savedDecks', JSON.stringify(decks));
         
         const addCardToDeck = (card) => {
             currentDeck.push(card);
@@ -1059,27 +1067,42 @@
             renderDeckList();
         };
 
-        const handleSaveDeck = () => {
+        const handleSaveDeck = async () => {
             hideMessage();
             const name = deckNameEl.value.trim();
             if (!name || currentDeck.length === 0) {
                 showMessage('Please provide a deck name and add at least one card.', true);
                 return;
             }
-            const decks = getSavedDecks();
-            decks[name] = {
+            if (!myUserId) {
+                showMessage('Error: You must be logged in to save a deck.', true);
+                return;
+            }
+
+            const deckData = {
+                name: name,
                 cardIds: currentDeck.map(c => c.id),
-                commanderIds: commanders.map(c => c.id)
+                commanderIds: commanders.map(c => c.id),
+                createdAt: firebase.firestore.FieldValue.serverTimestamp() // Good practice to timestamp saves
             };
-            saveDecks(decks);
-            renderSavedDecks();
-            showMessage(`Success: Deck "${name}" has been saved!`, false);
+
+            try {
+                // This is the core change: we are now saving to a 'decks' sub-collection
+                // that lives inside a document specific to the current user.
+                const deckRef = db.collection('users').doc(myUserId).collection('decks').doc(name);
+                await deckRef.set(deckData);
+
+                showMessage(`Success: Deck "${name}" has been saved!`, false);
+                // We will update renderSavedDecks in the next step.
+                await renderSavedDecks(); 
+            } catch (error) {
+                console.error("Error saving deck to Firestore:", error);
+                showMessage("Failed to save deck. Please check the console.", true);
+            }
         };
 
-        const loadDeck = (name) => {
-            const decks = getSavedDecks();
-            if (decks[name]) {
-                const deckData = decks[name];
+        const loadDeck = (name, deckData) => {
+            if (deckData) {
                 const cardIds = deckData.cardIds || [];
                 const commanderIds = deckData.commanderIds || [];
 
@@ -1092,11 +1115,20 @@
             }
         };
 
-        const deleteDeck = (name) => {
-            const decks = getSavedDecks();
-            delete decks[name];
-            saveDecks(decks);
-            renderSavedDecks();
+        const deleteDeck = async (name) => {
+            if (!myUserId) return;
+            if (!confirm(`Are you sure you want to permanently delete the deck "${name}"?`)) {
+                return;
+            }
+
+            try {
+                await db.collection('users').doc(myUserId).collection('decks').doc(name).delete();
+                showMessage(`Successfully deleted deck "${name}".`, false);
+                await renderSavedDecks(); // Re-render the list after deleting
+            } catch (error) {
+                console.error("Error deleting deck:", error);
+                showMessage("Failed to delete deck. Please check the console.", true);
+            }
         };
 
         // --- BULK IMPORT (CSV) LOGIC ---
