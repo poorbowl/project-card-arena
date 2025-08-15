@@ -1588,280 +1588,248 @@
             }
 
             async function initializeGame() {
-                contextMenu.addEventListener('click', handleContextMenuClick);
-                
-                window.addEventListener('click', (e) => {
-                    if (!contextMenu.contains(e.target) && !e.target.closest('.card') && !e.target.closest('.clickable-zone')) {
-                         hideContextMenu();
-                    }
-                });
-                window.addEventListener('contextmenu', (e) => {
-                     const target = e.target;
-                     if (!target.closest('.card') && !target.closest(`#${myPlayerId}-library`)) {
-                         hideContextMenu();
-                     }
-                });
-
-                mainGridEl.addEventListener('click', (event) => {
-                    if (event.target.id === 'passTurnBtn') {
-                        handlePassTurn();
-                        return;
-                    }
-                    const removeButton = event.target.closest('.remove-player-btn');
-                    if (removeButton) {
-                        const playerIdToRemove = removeButton.dataset.removePlayerId;
-                        if (playerIdToRemove) {
-                            handleRemovePlayer(playerIdToRemove);
-                        }
-                        return;
-                    }
-                    const button = event.target.closest('button[data-player-id]');
-                    if (button) { // This allows the buttons to work for any player
-                        handleLifeChange(button.dataset.playerId, button.dataset.action);
-                    }
-                });
-                mainGridEl.addEventListener('change', (event) => {
-                    if (event.target.id === `${myPlayerId}-life-total`) {
-                        handleLifeTextEntry(event);
-                    }
-                });
-                
-                zoneViewerClose.addEventListener('click', closeZoneViewer);
-                zoneViewerModal.addEventListener('click', (e) => {
-                    if (e.target === zoneViewerModal) closeZoneViewer();
-                });
-
-                librarySearchClose.addEventListener('click', closeLibrarySearch);
-                librarySearchInput.addEventListener('input', filterLibrary);
-                finishInteractiveBtn.addEventListener('click', finishInteractiveAction);
-                leaveGameBtn.addEventListener('click', leaveGame);
-                
-                // --- INTEGRATED CHAT LOGIC ---
-                function openChat() {
-                    document.body.dataset.chatState = 'open';
-                    chatNotification.classList.add('hidden');
-                    chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+            // --- EVENT LISTENERS ---
+            contextMenu.addEventListener('click', handleContextMenuClick);
+            window.addEventListener('click', (e) => {
+                if (!contextMenu.contains(e.target) && !e.target.closest('.card') && !e.target.closest('.clickable-zone')) {
+                    hideContextMenu();
                 }
-                function minimizeChat() {
-                    document.body.dataset.chatState = 'closed';
+            });
+            window.addEventListener('contextmenu', (e) => {
+                const target = e.target;
+                if (!target.closest('.card') && !target.closest(`#${myPlayerId}-library`)) {
+                    hideContextMenu();
                 }
-                chatToggleButton.addEventListener('click', openChat);
-                chatMinimizeButton.addEventListener('click', minimizeChat);
-                chatInputEl.addEventListener('keydown', handleSendMessage);
-                // --- END INTEGRATED CHAT LOGIC ---
-
-                const tokenCreateBtn = document.getElementById('token-creator-create');
-                const tokenCancelBtn = document.getElementById('token-creator-cancel');
-                const commonTokenSelect = document.getElementById('common-token-select');
-
-                tokenCancelBtn.addEventListener('click', () => tokenCreatorModal.classList.add('hidden'));
-
-                tokenCreateBtn.addEventListener('click', () => {
-                    const name = document.getElementById('token-name').value;
-                    const pt = document.getElementById('token-pt').value;
-                    const text = document.getElementById('token-text').value;
-                    if(name) {
-                        createToken({ name, pt, text });
-                        document.getElementById('token-name').value = '';
-                        document.getElementById('token-pt').value = '';
-                        document.getElementById('token-text').value = '';
-                    }
-                });
-
-                commonTokenSelect.addEventListener('change', (e) => {
-                    const selected = e.target.value;
-                    if(!selected) return;
-                    let tokenData = {};
-                    switch(selected) {
-                        case 'Treasure':
-                            tokenData = { name: 'Treasure', text: '{T}, Sacrifice this artifact: Add one mana of any color.'};
-                            break;
-                        case 'Food':
-                            tokenData = { name: 'Food', text: '{2}, {T}, Sacrifice this artifact: You gain 3 life.'};
-                            break;
-                        case 'Clue':
-                             tokenData = { name: 'Clue', text: '{2}, Sacrifice this artifact: Draw a card.'};
-                             break;
-                        case '1/1 Human':
-                             tokenData = { name: 'Human', pt: '1/1'};
-                             break;
-                        case '1/1 Goblin':
-                            tokenData = { name: 'Goblin', pt: '1/1'};
-                            break;
-                        case '1/1 Elf Warrior':
-                             tokenData = { name: 'Elf Warrior', pt: '1/1'};
-                             break;
-                        case '2/2 Zombie':
-                             tokenData = { name: 'Zombie', pt: '2/2'};
-                             break;
-                    }
-                    if (Object.keys(tokenData).length > 0) {
-                        createToken(tokenData);
-                    }
-                    e.target.value = "";
-                });
-
-
-                const urlParams = new URLSearchParams(window.location.search);
-                gameId = urlParams.get('gameId');
-                gameIdDisplayEl.textContent = gameId;
-
-                if (!gameId) {
-                    document.body.innerHTML = '<h1 class="text-red-500 text-2xl p-8">Error: No game ID provided.</h1>';
+            });
+            mainGridEl.addEventListener('click', (event) => {
+                if (event.target.id === 'passTurnBtn') {
+                    handlePassTurn();
                     return;
                 }
-                gameRef = realdb.ref(`games/${gameId}`);
+                const removeButton = event.target.closest('.remove-player-btn');
+                if (removeButton) {
+                    const playerIdToRemove = removeButton.dataset.removePlayerId;
+                    if (playerIdToRemove) {
+                        handleRemovePlayer(playerIdToRemove);
+                    }
+                    return;
+                }
+                const button = event.target.closest('button[data-player-id]');
+                if (button) {
+                    handleLifeChange(button.dataset.playerId, button.dataset.action);
+                }
+            });
+            mainGridEl.addEventListener('change', (event) => {
+                if (event.target.id === `${myPlayerId}-life-total`) {
+                    handleLifeTextEntry(event);
+                }
+            });
+            zoneViewerClose.addEventListener('click', closeZoneViewer);
+            zoneViewerModal.addEventListener('click', (e) => {
+                if (e.target === zoneViewerModal) closeZoneViewer();
+            });
+            librarySearchClose.addEventListener('click', closeLibrarySearch);
+            librarySearchInput.addEventListener('input', filterLibrary);
+            finishInteractiveBtn.addEventListener('click', finishInteractiveAction);
+            leaveGameBtn.addEventListener('click', leaveGame);
 
-                try {
-                    const snapshot = await db.collection('cards').get();
-                    allCardsFromDb = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            // Chat Logic
+            chatToggleButton.addEventListener('click', () => {
+                document.body.dataset.chatState = 'open';
+                chatNotification.classList.add('hidden');
+                chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+            });
+            chatMinimizeButton.addEventListener('click', () => {
+                document.body.dataset.chatState = 'closed';
+            });
+            chatInputEl.addEventListener('keydown', handleSendMessage);
 
-                    const { user } = await firebase.auth().signInAnonymously();
+            // Token Creator Logic
+            const tokenCreateBtn = document.getElementById('token-creator-create');
+            const tokenCancelBtn = document.getElementById('token-creator-cancel');
+            const commonTokenSelect = document.getElementById('common-token-select');
+            tokenCancelBtn.addEventListener('click', () => tokenCreatorModal.classList.add('hidden'));
+            tokenCreateBtn.addEventListener('click', () => {
+                const name = document.getElementById('token-name').value;
+                const pt = document.getElementById('token-pt').value;
+                const text = document.getElementById('token-text').value;
+                if(name) {
+                    createToken({ name, pt, text });
+                    document.getElementById('token-name').value = '';
+                    document.getElementById('token-pt').value = '';
+                    document.getElementById('token-text').value = '';
+                }
+            });
+            commonTokenSelect.addEventListener('change', (e) => {
+                const selected = e.target.value;
+                if(!selected) return;
+                let tokenData = {};
+                switch(selected) {
+                    case 'Treasure': tokenData = { name: 'Treasure', text: '{T}, Sacrifice this artifact: Add one mana of any color.'}; break;
+                    case 'Food': tokenData = { name: 'Food', text: '{2}, {T}, Sacrifice this artifact: You gain 3 life.'}; break;
+                    case 'Clue': tokenData = { name: 'Clue', text: '{2}, Sacrifice this artifact: Draw a card.'}; break;
+                    case '1/1 Human': tokenData = { name: 'Human', pt: '1/1'}; break;
+                    case '1/1 Goblin': tokenData = { name: 'Goblin', pt: '1/1'}; break;
+                    case '1/1 Elf Warrior': tokenData = { name: 'Elf Warrior', pt: '1/1'}; break;
+                    case '2/2 Zombie': tokenData = { name: 'Zombie', pt: '2/2'}; break;
+                }
+                if (Object.keys(tokenData).length > 0) {
+                    createToken(tokenData);
+                }
+                e.target.value = "";
+            });
+
+            // --- AUTHENTICATION AND GAME SETUP ---
+            firebase.auth().onAuthStateChanged(async (user) => {
+                if (user) {
+                    // User is signed in, proceed with game setup.
                     myUserId = user.uid;
+                    try {
+                        const urlParams = new URLSearchParams(window.location.search);
+                        gameId = urlParams.get('gameId');
+                        gameIdDisplayEl.textContent = gameId;
 
-                    const { committed, snapshot: finalSnapshot } = await gameRef.transaction(currentGameState => {
-                        if (currentGameState) {
-                            let isAlreadyInGame = false;
-                            let localPlayerId = null;
-                            if (currentGameState.players) {
-                                Object.entries(currentGameState.players).forEach(([pId, pData]) => {
-                                    if (pData && pData.uid === myUserId) {
-                                        isAlreadyInGame = true;
-                                        localPlayerId = pId;
-                                    }
-                                });
-                            } else {
-                                currentGameState.players = {};
-                            }
+                        if (!gameId) {
+                            document.body.innerHTML = '<h1 class="text-red-500 text-2xl p-8">Error: No game ID provided.</h1>';
+                            return;
+                        }
+                        gameRef = realdb.ref(`games/${gameId}`);
 
-                            const pendingData = JSON.parse(localStorage.getItem('pendingJoinData'));
+                        const snapshot = await db.collection('cards').get();
+                        allCardsFromDb = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-                            if (isAlreadyInGame && pendingData && currentGameState.players[localPlayerId] && !currentGameState.players[localPlayerId].deckLoaded) {
-                                const playerToUpdate = currentGameState.players[localPlayerId];
-                                playerToUpdate.name = pendingData.playerName;
-                                playerToUpdate.deck = pendingData.deck;
-                                playerToUpdate.commander = pendingData.commanders;
-                                playerToUpdate.deckLoaded = true;
-                                localStorage.removeItem('pendingJoinData');
-                            } 
-                            else if (!isAlreadyInGame) {
-                                const p1 = currentGameState.players.p1;
-                                const openSlot = ['p2', 'p3', 'p4'].find(slot => !currentGameState.players[slot]);
-                                if (openSlot) {
-                                    localPlayerId = openSlot;
-                                    const startingLife = p1 ? p1.life : 40; 
-                                    
-                                    if (pendingData) {
-                                    // This is the complete, final version for joining players
-                                    // Create a deep copy to ensure unique card instances, and shuffles the deck
+                        const { committed, snapshot: finalSnapshot } = await gameRef.transaction(currentGameState => {
+                            if (currentGameState) {
+                                let isAlreadyInGame = false;
+                                let localPlayerId = null;
+                                if (currentGameState.players) {
+                                    Object.entries(currentGameState.players).forEach(([pId, pData]) => {
+                                        if (pData && pData.uid === myUserId) {
+                                            isAlreadyInGame = true;
+                                            localPlayerId = pId;
+                                        }
+                                    });
+                                } else {
+                                    currentGameState.players = {};
+                                }
+
+                                const pendingData = JSON.parse(localStorage.getItem('pendingJoinData'));
+
+                                if (isAlreadyInGame && pendingData && currentGameState.players[localPlayerId] && !currentGameState.players[localPlayerId].deckLoaded) {
+                                    const playerToUpdate = currentGameState.players[localPlayerId];
+                                    playerToUpdate.name = pendingData.playerName;
                                     const deck = JSON.parse(JSON.stringify(pendingData.deck));
                                     shuffle(deck);
-                                    
-                                    pendingData.deck.forEach(card => {
-                                        card.instanceId = `card-${Date.now()}-${Math.random()}`;
-                                    });
+                                    deck.forEach(card => { card.instanceId = `card-${Date.now()}-${Math.random()}`; });
+                                    if(pendingData.commanders) {
+                                        pendingData.commanders.forEach(card => { card.instanceId = `card-${Date.now()}-${Math.random()}`; });
+                                    }
+                                    playerToUpdate.deck = deck;
+                                    playerToUpdate.commander = pendingData.commanders;
+                                    playerToUpdate.deckLoaded = true;
+                                    localStorage.removeItem('pendingJoinData');
+                                } 
+                                else if (!isAlreadyInGame) {
+                                    const p1 = currentGameState.players.p1;
+                                    const openSlot = ['p2', 'p3', 'p4'].find(slot => !currentGameState.players[slot]);
+                                    if (openSlot) {
+                                        localPlayerId = openSlot;
+                                        const startingLife = p1 ? p1.life : 40; 
+                                        
+                                        if (pendingData) {
+                                            const deck = JSON.parse(JSON.stringify(pendingData.deck));
+                                            shuffle(deck);
+                                            deck.forEach(card => { card.instanceId = `card-${Date.now()}-${Math.random()}`; });
+                                            if (pendingData.commanders) {
+                                                pendingData.commanders.forEach(card => { card.instanceId = `card-${Date.now()}-${Math.random()}`; });
+                                            }
+                                            
+                                            currentGameState.players[openSlot] = { 
+                                                uid: myUserId, name: pendingData.playerName, life: startingLife, 
+                                                deck: deck, hand: [], battlefield: [], graveyard:[], exile:[], 
+                                                commander: pendingData.commanders, deckLoaded: true 
+                                            };
+                                            localStorage.removeItem('pendingJoinData');
+                                        } else {
+                                            currentGameState.players[openSlot] = { uid: myUserId, name: `Player ${openSlot.slice(1)}`, life: startingLife, deck: [], hand: [], battlefield: [], graveyard:[], exile:[], commander:[], deckLoaded: false };
+                                        }
+                                    }
+                                }
 
-                                    if (pendingData.commanders) { // Safety check for commanders
-                                        pendingData.commanders.forEach(card => {
-                                            card.instanceId = `card-${Date.now()}-${Math.random()}`;
+                                const playerIds = Object.keys(currentGameState.players).sort();
+                                currentGameState.turnOrder = playerIds;
+                                if (currentGameState.currentPlayerIndex === undefined || currentGameState.currentPlayerIndex >= playerIds.length) {
+                                    currentGameState.currentPlayerIndex = 0;
+                                }
+
+                                const p1 = currentGameState.players.p1;
+                                 if (localPlayerId === 'p1' && p1) {
+                                     if (p1.deck && !p1.shuffled) {
+                                         const deck = JSON.parse(JSON.stringify(p1.deck || []));
+                                         shuffle(deck);
+                                         deck.forEach(card => { card.instanceId = `card-${Date.now()}-${Math.random()}`; });
+                                         p1.deck = deck;
+                                         p1.shuffled = true;
+                                     }
+                                     if (p1.commander && p1.commander.length > 0) {
+                                         p1.commander.forEach(c => {
+                                             if (!c.instanceId) c.instanceId = `card-${Date.now()}-${Math.random()}`;
+                                         });
+                                     }
+                                 }
+                            }
+                            return currentGameState;
+                        });
+
+                        if (committed) {
+                            const newGameState = finalSnapshot.val();
+                            if (newGameState) {
+                                gameState = newGameState;
+                                if (gameState.players) {
+                                    Object.entries(gameState.players).forEach(([pId, pData]) => {
+                                        if (pData && pData.uid === myUserId) {
+                                            myPlayerId = pId;
+                                        }
+                                    });
+                                }
+                                renderBoard();
+                            }
+                            gameRef.on('value', (snapshot) => {
+                                const newGameState = snapshot.val();
+                                if (newGameState) {
+                                    gameState = newGameState;
+                                     if (gameState.players) {
+                                        Object.entries(gameState.players).forEach(([pId, pData]) => {
+                                            if (pData && pData.uid === myUserId) {
+                                                myPlayerId = pId;
+                                            }
                                         });
                                     }
-                                    
-                                    currentGameState.players[openSlot] = { 
-                                        uid: myUserId, 
-                                        name: pendingData.playerName, 
-                                        life: startingLife, 
-                                        deck: deck, 
-                                        hand: [], 
-                                        battlefield: [], 
-                                        graveyard:[], 
-                                        exile:[], 
-                                        commander: pendingData.commanders, 
-                                        deckLoaded: true 
-                                    };
-                                    localStorage.removeItem('pendingJoinData');
-                                } else {
-                                    currentGameState.players[openSlot] = { uid: myUserId, name: `Player ${openSlot.slice(1)}`, life: startingLife, deck: [], hand: [], battlefield: [], graveyard:[], exile:[], commander:[], deckLoaded: false };
+                                    renderBoard();
                                 }
-                                }
-                            }
-
-                            const playerIds = Object.keys(currentGameState.players).sort();
-                            currentGameState.turnOrder = playerIds;
-                            if (currentGameState.currentPlayerIndex === undefined || currentGameState.currentPlayerIndex >= playerIds.length) {
-                                currentGameState.currentPlayerIndex = 0;
-                            }
-
-                            const p1 = currentGameState.players.p1;
-                             if (localPlayerId === 'p1' && p1) {
-                                 if (p1.deck && !p1.shuffled) {
-                                     const deck = JSON.parse(JSON.stringify(p1.deck || []));
-                                     shuffle(deck);
-
-                                    // ADD THIS SNIPPET HERE
-                                      deck.forEach(card => {
-                                          card.instanceId = `card-${Date.now()}-${Math.random()}`;
-                                      });
-                                      // END SNIPPET
-
-                                     p1.deck = deck;
-                                     p1.shuffled = true;
-                                 }
-                                 if (p1.commander && p1.commander.length > 0) {
-                                     p1.commander.forEach(c => {
-                                         if (!c.instanceId) c.instanceId = `card-${Date.now()}-${Math.random()}`;
-                                     });
-                                 }
-                             }
+                            });
                         }
-                        return currentGameState;
-                    });
 
-                    if (committed) {
-                        const newGameState = finalSnapshot.val();
-                        if (newGameState) {
-                            gameState = newGameState;
-                            if (gameState.players) {
-                                Object.entries(gameState.players).forEach(([pId, pData]) => {
-                                    if (pData && pData.uid === myUserId) {
-                                        myPlayerId = pId;
-                                    }
-                                });
+                        // CHAT LISTENER
+                        const chatRef = gameRef.child('chat');
+                        chatRef.on('child_added', (snapshot) => {
+                            const message = snapshot.val();
+                            renderChatMessage(message);
+                            if (document.body.dataset.chatState === 'closed') {
+                                chatNotification.classList.remove('hidden');
                             }
-                            renderBoard();
-                        }
-                        gameRef.on('value', (snapshot) => {
-                        const newGameState = snapshot.val();
-                        if (newGameState) {
-                            gameState = newGameState;
-                             if (gameState.players) {
-                                Object.entries(gameState.players).forEach(([pId, pData]) => {
-                                    if (pData && pData.uid === myUserId) {
-                                        myPlayerId = pId;
-                                    }
-                                });
-                            }
-                            renderBoard();
-                        }
-                    });
+                        });
+
+                    } catch (error) {
+                        console.error("Initialization failed:", error);
+                        document.body.innerHTML = '<h1 class="text-red-500 text-2xl p-8">Error: Could not connect to the server.</h1>';
                     }
-
-                    // CHAT LISTENER
-                    const chatRef = gameRef.child('chat');
-                    chatRef.on('child_added', (snapshot) => {
-                        const message = snapshot.val();
-                        renderChatMessage(message);
-                        if (document.body.dataset.chatState === 'closed') {
-                            chatNotification.classList.remove('hidden');
-                        }
-                    });
-
-                    
-                } catch (error) {
-                    console.error("Initialization failed:", error);
-                    document.body.innerHTML = '<h1 class="text-red-500 text-2xl p-8">Error: Could not connect to the server.</h1>';
+                } else {
+                    // No user is signed in. Redirect to the login page.
+                    window.location.href = 'index.html';
                 }
-            }
+            });
+        }
             
             initializeGame();
         });
