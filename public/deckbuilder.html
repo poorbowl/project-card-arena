@@ -527,30 +527,31 @@
         }
         const renderCard = (card, container) => {
             const cardWrapper = document.createElement('div');
-            cardWrapper.className = 'p-2 bg-gray-700 rounded-lg flex flex-col items-center justify-between transition-all';
+            // ADDED border-2 and border-transparent to prevent layout shift
+            cardWrapper.className = 'p-2 bg-gray-700 rounded-lg flex flex-col items-center justify-between transition-all border-2 border-transparent';
 
-            // --- NEW: Add a highlight if the card is selected ---
+            // --- UPDATED: Add a highlight if the card is selected ---
             if (selectedCards.has(card.id)) {
-                cardWrapper.classList.add('ring-4', 'ring-blue-500');
+                cardWrapper.classList.remove('border-transparent');
+                cardWrapper.classList.add('border-blue-500'); // Use border instead of ring
             }
 
             const clickableArea = document.createElement('div');
             clickableArea.className = 'cursor-pointer text-center';
 
-            // --- NEW: This is the core logic change ---
             clickableArea.addEventListener('click', () => {
                 if (isSelectMode) {
-                    // If in select mode, toggle selection
                     if (selectedCards.has(card.id)) {
                         selectedCards.delete(card.id);
-                        cardWrapper.classList.remove('ring-4', 'ring-blue-500');
+                        cardWrapper.classList.add('border-transparent');
+                        cardWrapper.classList.remove('border-blue-500'); // Use border instead of ring
                     } else {
                         selectedCards.add(card.id);
-                        cardWrapper.classList.add('ring-4', 'ring-blue-500');
+                        cardWrapper.classList.remove('border-transparent');
+                        cardWrapper.classList.add('border-blue-500'); // Use border instead of ring
                     }
                     selectionCountEl.textContent = `${selectedCards.size} cards selected`;
                 } else {
-                    // If not in select mode, add the card to the deck
                     addCardToDeck(card);
                 }
             });
@@ -1341,9 +1342,9 @@
 
             cards.forEach(cardData => {
                 const cardWrapper = document.createElement('div');
-                // THIS IS THE CORRECTED LINE: 'card-wrapper' is now part of the main class list.
-                cardWrapper.className = 'card-wrapper p-2 bg-gray-700 rounded-lg flex flex-col items-center justify-between cursor-pointer transition-all';
-                cardWrapper.dataset.cardId = cardData.name; // Use name as a temporary ID for selection
+                // ADDED border-2 and border-transparent here
+                cardWrapper.className = 'card-wrapper p-2 bg-gray-700 rounded-lg flex flex-col items-center justify-between cursor-pointer transition-all border-2 border-transparent';
+                cardWrapper.dataset.cardId = cardData.name;
 
                 const img = document.createElement('img');
                 img.src = cardData.imageUrl || 'https://placehold.co/100x140/2d3748/e2e8f0?text=No+Image';
@@ -1360,10 +1361,12 @@
                 cardWrapper.addEventListener('click', () => {
                     if (importSelectedCards.has(cardData.name)) {
                         importSelectedCards.delete(cardData.name);
-                        cardWrapper.classList.remove('ring-4', 'ring-blue-500');
+                        cardWrapper.classList.add('border-transparent');
+                        cardWrapper.classList.remove('border-blue-500'); // Use border instead of ring
                     } else {
                         importSelectedCards.add(cardData.name);
-                        cardWrapper.classList.add('ring-4', 'ring-blue-500');
+                        cardWrapper.classList.remove('border-transparent');
+                        cardWrapper.classList.add('border-blue-500'); // Use border instead of ring
                     }
                     importSelectionCountEl.textContent = `${importSelectedCards.size} cards selected`;
                 });
