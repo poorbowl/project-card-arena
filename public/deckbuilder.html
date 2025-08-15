@@ -267,6 +267,18 @@
                     <option value="name_asc">Sort: Name (A-Z)</option>
                     <option value="name_desc">Sort: Name (Z-A)</option>
                 </select>
+                <div class="flex-grow"></div> <!-- This is a spacer to push the new button to the right -->
+                <button id="toggle-select-mode-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
+                    Select
+                </button>
+            </div>
+
+            <div id="selection-action-bar" class="hidden bg-gray-900 p-3 rounded-lg mb-4 flex justify-between items-center">
+                <span id="selection-count" class="text-gray-400">0 cards selected</span>
+                <div class="flex gap-4">
+                    <button id="add-selected-to-deck-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">Add to Deck</button>
+                    <button id="delete-selected-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Delete Selected</button>
+                </div>
             </div>
 
             <div id="cardCollection" class="bg-gray-900 p-4 rounded-lg min-h-[300px] grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"></div>
@@ -412,6 +424,11 @@
         const prevPageBtn = document.getElementById('prev-page-btn');
         const nextPageBtn = document.getElementById('next-page-btn');
         const pageInfoEl = document.getElementById('page-info');
+        const toggleSelectModeBtn = document.getElementById('toggle-select-mode-btn');
+        const selectionActionBar = document.getElementById('selection-action-bar');
+        const selectionCountEl = document.getElementById('selection-count');
+        const deleteSelectedBtn = document.getElementById('delete-selected-btn');
+        const addSelectedToDeckBtn = document.getElementById('add-selected-to-deck-btn');
         
         // --- DOM Elements (Pop-out) ---
         const cardPopoutEl = document.getElementById('card-popout');
@@ -432,6 +449,8 @@
         let editingCardId = null; 
         let csvFileToProcess = null;
         let fetchedCardsData = []; // To store the processed card data for CSV/direct export
+        let isSelectMode = false;
+        let selectedCards = new Set();
         let currentPage = 1;
         const cardsPerPage = 20; // You can change this number to show more or fewer cards
 
@@ -483,6 +502,25 @@
             };
             const targetArea = areaMap[area];
             if(targetArea) targetArea.classList.add('hidden');
+        };
+
+        //Toggle Select Mode
+        const toggleSelectMode = () => {
+            isSelectMode = !isSelectMode; // Flip the mode on/off
+            selectedCards.clear(); // Clear any previous selections
+
+            if (isSelectMode) {
+                toggleSelectModeBtn.textContent = 'Cancel';
+                toggleSelectModeBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                toggleSelectModeBtn.classList.add('bg-gray-600', 'hover:bg-gray-700');
+                selectionActionBar.classList.remove('hidden');
+            } else {
+                toggleSelectModeBtn.textContent = 'Select';
+                toggleSelectModeBtn.classList.remove('bg-gray-600', 'hover:bg-gray-700');
+                toggleSelectModeBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                selectionActionBar.classList.add('hidden');
+            }
+            renderFilteredCollection(); // Re-render the collection to update card styles
         };
 
         // --- RENDER FUNCTIONS ---
@@ -561,11 +599,34 @@
         }
         const renderCard = (card, container) => {
             const cardWrapper = document.createElement('div');
-            cardWrapper.className = 'p-2 bg-gray-700 rounded-lg flex flex-col items-center justify-between';
-            
+            cardWrapper.className = 'p-2 bg-gray-700 rounded-lg flex flex-col items-center justify-between transition-all';
+
+            // --- NEW: Add a highlight if the card is selected ---
+            if (selectedCards.has(card.id)) {
+                cardWrapper.classList.add('ring-4', 'ring-blue-500');
+            }
+
             const clickableArea = document.createElement('div');
             clickableArea.className = 'cursor-pointer text-center';
-            
+
+            // --- NEW: This is the core logic change ---
+            clickableArea.addEventListener('click', () => {
+                if (isSelectMode) {
+                    // If in select mode, toggle selection
+                    if (selectedCards.has(card.id)) {
+                        selectedCards.delete(card.id);
+                        cardWrapper.classList.remove('ring-4', 'ring-blue-500');
+                    } else {
+                        selectedCards.add(card.id);
+                        cardWrapper.classList.add('ring-4', 'ring-blue-500');
+                    }
+                    selectionCountEl.textContent = `${selectedCards.size} cards selected`;
+                } else {
+                    // If not in select mode, add the card to the deck
+                    addCardToDeck(card);
+                }
+            });
+
             const img = document.createElement('img');
             img.src = card.imageUrl || 'https://placehold.co/100x140/2d3748/e2e8f0?text=No+Image';
             img.alt = card.name;
@@ -577,9 +638,7 @@
 
             clickableArea.appendChild(img);
             clickableArea.appendChild(name);
-            clickableArea.addEventListener('click', () => addCardToDeck(card));
-            
-            // NEW: Card info section
+
             const infoDiv = document.createElement('div');
             infoDiv.className = 'text-center my-2 w-full';
 
@@ -589,14 +648,13 @@
             infoDiv.appendChild(typeText);
 
             const colorPips = document.createElement('div');
-            colorPips.className = 'flex justify-center items-center mt-1 h-4'; // h-4 gives it a fixed height
-            
+            colorPips.className = 'flex justify-center items-center mt-1 h-4';
             colorPips.innerHTML = parseManaCost(card.cost, 'mana-symbol');
             infoDiv.appendChild(colorPips);
 
             const buttonBar = document.createElement('div');
             buttonBar.className = 'flex justify-around w-full mt-2';
-            
+
             const editBtn = document.createElement('button');
             editBtn.textContent = 'Edit';
             editBtn.className = 'text-xs bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded';
@@ -614,12 +672,11 @@
             cardWrapper.appendChild(infoDiv);
             cardWrapper.appendChild(buttonBar);
 
-            // modified: Event listeners for the pop-out
             cardWrapper.addEventListener('mouseenter', (e) => showCardPopout(e, card));
             cardWrapper.addEventListener('mouseleave', hideCardPopout);
             cardWrapper.addEventListener('mousemove', moveCardPopout);
             container.appendChild(cardWrapper);
-            };
+        };
 
         /**
          * Helper function to determine a card's color identity from its mana cost.
@@ -941,6 +998,48 @@
             } catch (error) {
                 console.error("Error deleting card:", error);
                 showMessage("Failed to delete card. Check console for details.", true);
+            }
+        };
+
+        //Hand deleting multiple cards
+        const handleDeleteSelected = async () => {
+            if (selectedCards.size === 0) {
+                showMessage("No cards selected to delete.", true);
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to permanently delete ${selectedCards.size} selected cards? This action cannot be undone.`)) {
+                return;
+            }
+
+            try {
+                const batch = db.batch();
+
+                for (const cardId of selectedCards) {
+                    // Add the card document to the batch delete
+                    const cardRef = db.collection('users').doc(myUserId).collection('cards').doc(cardId);
+                    batch.delete(cardRef);
+
+                    // Check if the card has an image in Firebase Storage and add it to the delete queue
+                    const cardToDelete = allCards.find(c => c.id === cardId);
+                    if (cardToDelete && cardToDelete.imageUrl && cardToDelete.imageUrl.includes('firebasestorage.googleapis.com')) {
+                        const imageRef = storage.refFromURL(cardToDelete.imageUrl);
+                        // Note: Deleting images one by one is necessary, batching doesn't apply to storage directly
+                        await imageRef.delete().catch(err => console.error("Failed to delete an image:", err));
+                    }
+                }
+
+                await batch.commit(); // Commit all the document deletions at once
+
+                // Update the local state
+                allCards = allCards.filter(card => !selectedCards.has(card.id));
+
+                showMessage(`Successfully deleted ${selectedCards.size} cards.`, false);
+                toggleSelectMode(); // This will clear selection and re-render the collection
+
+            } catch (error) {
+                console.error("Error deleting selected cards:", error);
+                showMessage("Failed to delete selected cards. Check console.", true);
             }
         };
 
@@ -1534,6 +1633,16 @@
         nextPageBtn.addEventListener('click', () => {
             currentPage++;
             renderFilteredCollection();
+        });
+
+        // --- NEW Multi-Select Listeners ---
+        toggleSelectModeBtn.addEventListener('click', toggleSelectMode);
+
+        deleteSelectedBtn.addEventListener('click', handleDeleteSelected);
+
+        addSelectedToDeckBtn.addEventListener('click', () => {
+            // We will add the logic for this function later
+            console.log('Add to deck button clicked');
         });
 
         // Initial Load
