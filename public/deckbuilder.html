@@ -376,71 +376,20 @@
     </div>
 
     <script>
-        // --- DOM Elements (Main App) ---
-        const cardCollectionEl = document.getElementById('cardCollection');
-        const deckListEl = document.getElementById('deckList');
-        const commanderListEl = document.getElementById('commanderList');
-        const deckCountEl = document.getElementById('deckCount');
-        const deckNameEl = document.getElementById('deckName');
-        const saveDeckBtn = document.getElementById('saveDeck');
-        const savedDecksEl = document.getElementById('savedDecks');
-        const saveCardBtn = document.getElementById('saveCardBtn');
-        const cancelEditBtn = document.getElementById('cancelEditBtn');
-        const formTitleEl = document.getElementById('form-title');
-        const cardTypeSelect = document.getElementById('cardType');
-        const creatureFields = document.getElementById('creatureFields');
-        const planeswalkerFields = document.getElementById('planeswalkerFields');
-        const createGameBtn = document.getElementById('createGameBtn');
-        const joinGameBtn = document.getElementById('joinGameBtn');
-        const joinGameIdInput = document.getElementById('joinGameIdInput');
-        const messageAreaEl = document.getElementById('message-area');
-        const importCsvBtn = document.getElementById('importCsvBtn'); 
-        const imageUploadProgressEl = document.getElementById('image-upload-progress');
-        const lobbySectionEl = document.getElementById('lobby-section');
-        const lobbyControlsEl = document.getElementById('lobby-controls');
-        const gameCreatedSectionEl = document.getElementById('game-created-section');
-        const inviteLinkInputEl = document.getElementById('inviteLinkInput');
-        const copyLinkBtn = document.getElementById('copyLinkBtn');
-        const enterGameBtn = document.getElementById('enterGameBtn');
-        
-        // --- DOM Elements (Scryfall Importer) ---
-        const cardListInput = document.getElementById('cardListInput');
-        const fetchBtn = document.getElementById('fetchBtn');
-        const statusArea = document.getElementById('statusArea');
-        const resultsArea = document.getElementById('resultsArea');
-        const foundCardsGrid = document.getElementById('foundCardsGrid');
-        const notFoundList = document.getElementById('notFoundList');
-        const foundCount = document.getElementById('foundCount');
-        const notFoundCount = document.getElementById('notFoundCount');
-        const downloadCsvBtn = document.getElementById('downloadCsvBtn');
-        const addDirectlyBtn = document.getElementById('addDirectlyBtn');
+    // --- DOM Elements (Declared Globally) ---
+    let cardCollectionEl, deckListEl, commanderListEl, deckCountEl, deckNameEl, saveDeckBtn, savedDecksEl,
+        saveCardBtn, cancelEditBtn, formTitleEl, cardTypeSelect, creatureFields, planeswalkerFields,
+        createGameBtn, joinGameBtn, joinGameIdInput, messageAreaEl, importCsvBtn, imageUploadProgressEl,
+        lobbySectionEl, lobbyControlsEl, gameCreatedSectionEl, inviteLinkInputEl, copyLinkBtn, enterGameBtn,
+        cardListInput, fetchBtn, statusArea, resultsArea, foundCardsGrid, notFoundList, foundCount,
+        notFoundCount, downloadCsvBtn, addDirectlyBtn, importReviewModal, importReviewClose,
+        importSelectAllBtn, importDeselectAllBtn, importSelectionCountEl, importReviewContent,
+        importReviewCancel, importReviewConfirm, filterNameInput, filterTypeSelect, filterSortSelect,
+        filterColorSelect, filterSourceSelect, prevPageBtn, nextPageBtn, pageInfoEl, toggleSelectModeBtn,
+        selectionActionBar, selectionCountEl, deleteSelectedBtn, addSelectedToDeckBtn, cardPopoutEl,
+        popoutNameEl, popoutCostEl, popoutImgEl, popoutTypeEl, popoutPtEl, popoutTextEl, popoutFlavourEl;
 
-        // --- DOM Elements (Collection Management) ---
-        const filterNameInput = document.getElementById('filterName');
-        const filterTypeSelect = document.getElementById('filterType');
-        const filterSortSelect = document.getElementById('filterSort');
-        const filterColorSelect = document.getElementById('filterColor');
-        const filterSourceSelect = document.getElementById('filterSource');
-        const prevPageBtn = document.getElementById('prev-page-btn');
-        const nextPageBtn = document.getElementById('next-page-btn');
-        const pageInfoEl = document.getElementById('page-info');
-        const toggleSelectModeBtn = document.getElementById('toggle-select-mode-btn');
-        const selectionActionBar = document.getElementById('selection-action-bar');
-        const selectionCountEl = document.getElementById('selection-count');
-        const deleteSelectedBtn = document.getElementById('delete-selected-btn');
-        const addSelectedToDeckBtn = document.getElementById('add-selected-to-deck-btn');
-        
-        // --- DOM Elements (Pop-out) ---
-        const cardPopoutEl = document.getElementById('card-popout');
-        const popoutNameEl = document.getElementById('popout-name');
-        const popoutCostEl = document.getElementById('popout-cost');
-        const popoutImgEl = document.getElementById('popout-img');
-        const popoutTypeEl = document.getElementById('popout-type');
-        const popoutPtEl = document.getElementById('popout-pt');
-        const popoutTextEl = document.getElementById('popout-text');
-        const popoutFlavourEl = document.getElementById('popout-flavour');
-
-        // --- Global State ---
+    // --- Global State ---
         let allCards = [];
         let currentDeck = [];
         let commanders = [];
@@ -451,30 +400,9 @@
         let fetchedCardsData = []; // To store the processed card data for CSV/direct export
         let isSelectMode = false;
         let selectedCards = new Set();
+        let importSelectedCards = new Set();
         let currentPage = 1;
         const cardsPerPage = 20; // You can change this number to show more or fewer cards
-
-        // --- TABS & FORM LOGIC ---
-        const tabBtns = document.querySelectorAll('.tab-button');
-        const tabContents = document.querySelectorAll('.tab-content');
-        tabBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                tabBtns.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                const targetId = btn.id.replace('btn', 'content');
-                tabContents.forEach(content => {
-                    content.classList.remove('active');
-                    if (content.id === targetId) {
-                        content.classList.add('active');
-                    }
-                });
-            });
-        });
-        cardTypeSelect.addEventListener('change', () => {
-            const selectedType = cardTypeSelect.value;
-            creatureFields.classList.toggle('hidden', selectedType !== 'Creature');
-            planeswalkerFields.classList.toggle('hidden', selectedType !== 'Planeswalker');
-        });
 
         // --- MESSAGE FUNCTIONS ---
         const showMessage = (message, isError = true, area = 'create') => {
@@ -1407,6 +1335,100 @@
         };
 
         // --- SCRYFALL IMPORT LOGIC ---
+        function openImportReviewModal(cards) {
+            importReviewContent.innerHTML = ''; // Clear previous results
+            importSelectedCards.clear();
+
+            cards.forEach(cardData => {
+                const cardWrapper = document.createElement('div');
+                cardWrapper.className = 'p-2 bg-gray-700 rounded-lg flex flex-col items-center justify-between cursor-pointer transition-all';
+                cardWrapper.dataset.cardId = cardData.name; // Use name as a temporary ID for selection
+
+                const img = document.createElement('img');
+                img.src = cardData.imageUrl || 'https://placehold.co/100x140/2d3748/e2e8f0?text=No+Image';
+                img.alt = cardData.name;
+                img.className = 'card-image-sm object-cover rounded-md mb-2 pointer-events-none'; // Disable pointer events on image
+
+                const name = document.createElement('span');
+                name.textContent = cardData.name;
+                name.className = 'text-xs text-center font-semibold pointer-events-none';
+
+                cardWrapper.appendChild(img);
+                cardWrapper.appendChild(name);
+
+                cardWrapper.addEventListener('click', () => {
+                    if (importSelectedCards.has(cardData.name)) {
+                        importSelectedCards.delete(cardData.name);
+                        cardWrapper.classList.remove('ring-4', 'ring-blue-500');
+                    } else {
+                        importSelectedCards.add(cardData.name);
+                        cardWrapper.classList.add('ring-4', 'ring-blue-500');
+                    }
+                    importSelectionCountEl.textContent = `${importSelectedCards.size} cards selected`;
+                });
+
+                importReviewContent.appendChild(cardWrapper);
+            });
+
+            importSelectionCountEl.textContent = '0 cards selected';
+            importReviewModal.classList.remove('hidden');
+        }
+
+        function closeImportReviewModal() {
+            importReviewModal.classList.add('hidden');
+            importReviewContent.innerHTML = '';
+            importSelectedCards.clear();
+        }
+
+        const handleConfirmImport = async () => {
+            if (importSelectedCards.size === 0) {
+                showMessage("No cards selected to import.", true, 'scryfall');
+                return;
+            }
+
+            const cardsToImport = fetchedCardsData.filter(card => importSelectedCards.has(card.name));
+
+            const cardsToCreate = [];
+            let skippedCount = 0;
+            const existingCardNames = new Set(allCards.map(c => c.name.toLowerCase()));
+
+            for (const cardData of cardsToImport) {
+                if (!isBasicLand(cardData.name, cardData.type) && existingCardNames.has(cardData.name.toLowerCase())) {
+                    skippedCount++;
+                    continue;
+                }
+                cardsToCreate.push(cardData);
+                existingCardNames.add(cardData.name.toLowerCase());
+            }
+
+            if (cardsToCreate.length > 0) {
+                try {
+                    const batch = db.batch();
+                    cardsToCreate.forEach(cardData => {
+                        const docRef = db.collection('users').doc(myUserId).collection('cards').doc();
+                        batch.set(docRef, cardData);
+                    });
+                    await batch.commit();
+
+                    await loadAllCardsFromFirebase(); // Refresh the main collection view
+
+                    let successMessage = `Successfully added ${cardsToCreate.length} new cards to your collection!`;
+                    if (skippedCount > 0) successMessage += ` Skipped ${skippedCount} duplicate cards.`;
+                    showMessage(successMessage, false, 'scryfall');
+
+                } catch (error) {
+                    console.error("Error saving imported cards to Firestore:", error);
+                    showMessage("An error occurred while saving new cards.", true, 'scryfall');
+                }
+            } else {
+                let message = "No new cards were added.";
+                if (skippedCount > 0) message += ` All ${skippedCount} selected cards were already in your collection.`
+                showMessage(message, false, 'scryfall');
+            }
+
+            closeImportReviewModal();
+        };
+
         async function fetchCardsFromScryfall(names) {
             const allFoundCards = [];
             const allNotFoundNames = [];
@@ -1539,8 +1561,7 @@
             try {
                 const { found, notFound } = await fetchCardsFromScryfall(names);
                 fetchedCardsData = found.map(processScryfallCard);
-                displayResults(fetchedCardsData, notFound);
-                showMessage('Fetch complete!', false, 'scryfall');
+                openImportReviewModal(fetchedCardsData);
                 if (fetchedCardsData.length > 0) {
                     downloadCsvBtn.disabled = false;
                     addDirectlyBtn.disabled = false;
@@ -1601,82 +1622,174 @@
 
         // --- INITIALIZATION ---
         async function init() {
-            try {
-                firebase.auth().onAuthStateChanged(async (user) => {
-    if (user) {
-        // User is signed in.
-        myUserId = user.uid;
-        console.log("DEBUG: User signed in with UID:", myUserId);
+            firebase.auth().onAuthStateChanged(async (user) => {
+                if (user) {
+                    // User is signed in.
+                    myUserId = user.uid;
+                    console.log("DEBUG: User signed in with UID:", myUserId);
 
-        // All the original setup code will now run *after* we confirm the user is logged in.
-        // Main App Listeners
-        saveCardBtn.addEventListener('click', handleSaveCard);
-        cancelEditBtn.addEventListener('click', resetForm);
-        saveDeckBtn.addEventListener('click', handleSaveDeck);
-        createGameBtn.addEventListener('click', handleCreateGame);
-        joinGameBtn.addEventListener('click', handleJoinGame);
-        copyLinkBtn.addEventListener('click', handleCopyLink);
+                    try {
+                        // --- ASSIGN ALL DOM ELEMENTS ---
+                        cardCollectionEl = document.getElementById('cardCollection');
+                        deckListEl = document.getElementById('deckList');
+                        commanderListEl = document.getElementById('commanderList');
+                        deckCountEl = document.getElementById('deckCount');
+                        deckNameEl = document.getElementById('deckName');
+                        saveDeckBtn = document.getElementById('saveDeck');
+                        savedDecksEl = document.getElementById('savedDecks');
+                        saveCardBtn = document.getElementById('saveCardBtn');
+                        cancelEditBtn = document.getElementById('cancelEditBtn');
+                        formTitleEl = document.getElementById('form-title');
+                        cardTypeSelect = document.getElementById('cardType');
+                        creatureFields = document.getElementById('creatureFields');
+                        planeswalkerFields = document.getElementById('planeswalkerFields');
+                        createGameBtn = document.getElementById('createGameBtn');
+                        joinGameBtn = document.getElementById('joinGameBtn');
+                        joinGameIdInput = document.getElementById('joinGameIdInput');
+                        messageAreaEl = document.getElementById('message-area');
+                        importCsvBtn = document.getElementById('importCsvBtn');
+                        imageUploadProgressEl = document.getElementById('image-upload-progress');
+                        lobbySectionEl = document.getElementById('lobby-section');
+                        lobbyControlsEl = document.getElementById('lobby-controls');
+                        gameCreatedSectionEl = document.getElementById('game-created-section');
+                        inviteLinkInputEl = document.getElementById('inviteLinkInput');
+                        copyLinkBtn = document.getElementById('copyLinkBtn');
+                        enterGameBtn = document.getElementById('enterGameBtn');
+                        cardListInput = document.getElementById('cardListInput');
+                        fetchBtn = document.getElementById('fetchBtn');
+                        statusArea = document.getElementById('statusArea');
+                        resultsArea = document.getElementById('resultsArea');
+                        foundCardsGrid = document.getElementById('foundCardsGrid');
+                        notFoundList = document.getElementById('notFoundList');
+                        foundCount = document.getElementById('foundCount');
+                        notFoundCount = document.getElementById('notFoundCount');
+                        downloadCsvBtn = document.getElementById('downloadCsvBtn');
+                        addDirectlyBtn = document.getElementById('addDirectlyBtn');
+                        importReviewModal = document.getElementById('import-review-modal');
+                        importReviewClose = document.getElementById('import-review-close');
+                        importSelectAllBtn = document.getElementById('import-select-all-btn');
+                        importDeselectAllBtn = document.getElementById('import-deselect-all-btn');
+                        importSelectionCountEl = document.getElementById('import-selection-count');
+                        importReviewContent = document.getElementById('import-review-content');
+                        importReviewCancel = document.getElementById('import-review-cancel');
+                        importReviewConfirm = document.getElementById('import-review-confirm');
+                        filterNameInput = document.getElementById('filterName');
+                        filterTypeSelect = document.getElementById('filterType');
+                        filterSortSelect = document.getElementById('filterSort');
+                        filterColorSelect = document.getElementById('filterColor');
+                        filterSourceSelect = document.getElementById('filterSource');
+                        prevPageBtn = document.getElementById('prev-page-btn');
+                        nextPageBtn = document.getElementById('next-page-btn');
+                        pageInfoEl = document.getElementById('page-info');
+                        toggleSelectModeBtn = document.getElementById('toggle-select-mode-btn');
+                        selectionActionBar = document.getElementById('selection-action-bar');
+                        selectionCountEl = document.getElementById('selection-count');
+                        deleteSelectedBtn = document.getElementById('delete-selected-btn');
+                        addSelectedToDeckBtn = document.getElementById('add-selected-to-deck-btn');
+                        cardPopoutEl = document.getElementById('card-popout');
+                        popoutNameEl = document.getElementById('popout-name');
+                        popoutCostEl = document.getElementById('popout-cost');
+                        popoutImgEl = document.getElementById('popout-img');
+                        popoutTypeEl = document.getElementById('popout-type');
+                        popoutPtEl = document.getElementById('popout-pt');
+                        popoutTextEl = document.getElementById('popout-text');
+                        popoutFlavourEl = document.getElementById('popout-flavour');
 
-        // CSV Importer Listeners
-        document.getElementById('bulkImageUpload').addEventListener('change', handleImageUpload);
-        document.getElementById('csvFile').addEventListener('change', (event) => {
-            if (event.target.files && event.target.files.length > 0) {
-                csvFileToProcess = event.target.files[0];
-            }
-        });
-        importCsvBtn.addEventListener('click', handleCsvImport);
+                        // --- ATTACH ALL EVENT LISTENERS ---
+                        // --- TABS & FORM LOGIC ---
+                        const tabBtns = document.querySelectorAll('.tab-button');
+                        const tabContents = document.querySelectorAll('.tab-content');
+                        tabBtns.forEach(btn => {
+                            btn.addEventListener('click', () => {
+                                tabBtns.forEach(b => b.classList.remove('active'));
+                                btn.classList.add('active');
+                                const targetId = btn.id.replace('btn', 'content');
+                                tabContents.forEach(content => {
+                                    content.classList.remove('active');
+                                    if (content.id === targetId) {
+                                        content.classList.add('active');
+                                    }
+                                });
+                            });
+                        });
+                        cardTypeSelect.addEventListener('change', () => {
+                            const selectedType = cardTypeSelect.value;
+                            creatureFields.classList.toggle('hidden', selectedType !== 'Creature');
+                            planeswalkerFields.classList.toggle('hidden', selectedType !== 'Planeswalker');
+                        });
+                        saveCardBtn.addEventListener('click', handleSaveCard);
+                        cancelEditBtn.addEventListener('click', resetForm);
+                        saveDeckBtn.addEventListener('click', handleSaveDeck);
+                        createGameBtn.addEventListener('click', handleCreateGame);
+                        joinGameBtn.addEventListener('click', handleJoinGame);
+                        copyLinkBtn.addEventListener('click', handleCopyLink);
+                        document.getElementById('bulkImageUpload').addEventListener('change', handleImageUpload);
+                        document.getElementById('csvFile').addEventListener('change', (event) => {
+                            if (event.target.files && event.target.files.length > 0) {
+                                csvFileToProcess = event.target.files[0];
+                            }
+                        });
+                        importCsvBtn.addEventListener('click', handleCsvImport);
+                        fetchBtn.addEventListener('click', handleFetchClick);
+                        downloadCsvBtn.addEventListener('click', () => {
+                            const csv = convertToCSV(fetchedCardsData);
+                            downloadCSV(csv);
+                        });
+                        addDirectlyBtn.addEventListener('click', handleAddDirectly);
+                        filterNameInput.addEventListener('input', renderFilteredCollection);
+                        filterTypeSelect.addEventListener('change', renderFilteredCollection);
+                        filterSortSelect.addEventListener('change', renderFilteredCollection);
+                        filterColorSelect.addEventListener('change', renderFilteredCollection);
+                        filterSourceSelect.addEventListener('change', renderFilteredCollection);
+                        prevPageBtn.addEventListener('click', () => {
+                            if (currentPage > 1) {
+                                currentPage--;
+                                renderFilteredCollection();
+                            }
+                        });
+                        nextPageBtn.addEventListener('click', () => {
+                            currentPage++;
+                            renderFilteredCollection();
+                        });
+                        toggleSelectModeBtn.addEventListener('click', toggleSelectMode);
+                        deleteSelectedBtn.addEventListener('click', handleDeleteSelected);
+                        addSelectedToDeckBtn.addEventListener('click', handleAddSelectedToDeck);
 
-        // Scryfall Importer Listeners
-        fetchBtn.addEventListener('click', handleFetchClick);
-        downloadCsvBtn.addEventListener('click', () => {
-            const csv = convertToCSV(fetchedCardsData);
-            downloadCSV(csv);
-        });
-        addDirectlyBtn.addEventListener('click', handleAddDirectly);
+                        // --- Import Review Modal Listeners ---
+                        importReviewClose.addEventListener('click', closeImportReviewModal);
+                        importReviewCancel.addEventListener('click', closeImportReviewModal);
+                        importReviewConfirm.addEventListener('click', handleConfirmImport);
 
-        // Collection Filter Listeners
-        filterNameInput.addEventListener('input', renderFilteredCollection);
-        filterTypeSelect.addEventListener('change', renderFilteredCollection);
-        filterSortSelect.addEventListener('change', renderFilteredCollection);
-        filterColorSelect.addEventListener('change', renderFilteredCollection);
-        filterSourceSelect.addEventListener('change', renderFilteredCollection);
+                        importSelectAllBtn.addEventListener('click', () => {
+                            importReviewContent.querySelectorAll('.card-wrapper').forEach(wrapper => {
+                                if (!importSelectedCards.has(wrapper.dataset.cardId)) {
+                                    wrapper.click();
+                                }
+                            });
+                        });
 
-        // Next and Previous Page buttons for card library
-        prevPageBtn.addEventListener('click', () => {
-            if (currentPage > 1) {
-                currentPage--;
-                renderFilteredCollection();
-            }
-        });
-        nextPageBtn.addEventListener('click', () => {
-            currentPage++;
-            renderFilteredCollection();
-        });
+                        importDeselectAllBtn.addEventListener('click', () => {
+                            importReviewContent.querySelectorAll('.card-wrapper').forEach(wrapper => {
+                                if (importSelectedCards.has(wrapper.dataset.cardId)) {
+                                    wrapper.click();
+                                }
+                            });
+                        });
 
-        // --- NEW Multi-Select Listeners ---
-        toggleSelectModeBtn.addEventListener('click', toggleSelectMode);
+                        // --- INITIAL LOAD ---
+                        await loadAllCardsFromFirebase();
+                        await renderSavedDecks();
+                        cardTypeSelect.dispatchEvent(new Event('change'));
 
-        deleteSelectedBtn.addEventListener('click', handleDeleteSelected);
-
-        addSelectedToDeckBtn.addEventListener('click', handleAddSelectedToDeck);
-
-        // Initial Load
-        await loadAllCardsFromFirebase();
-        renderSavedDecks();
-        cardTypeSelect.dispatchEvent(new Event('change'));
-
-    } else {
-        // No user is signed in. Redirect to the login page.
-        window.location.href = 'index.html';
-    }
-});
-                console.log("DEBUG: User signed in anonymously with UID:", myUserId);
-
-
-            } catch (error) {
-                console.error("Authentication or Initialization failed:", error);
-                document.body.innerHTML = `<div class="text-red-400 p-8">Could not connect to the server. Please check the console and refresh the page. Error: ${error.message}</div>`;
-            }
+                    } catch (error) {
+                        console.error("Initialization failed:", error);
+                        document.body.innerHTML = `<div class="text-red-400 p-8">Could not connect to the server. Please check the console and refresh the page. Error: ${error.message}</div>`;
+                    }
+                } else {
+                    // No user is signed in. Redirect to the login page.
+                    window.location.href = 'index.html';
+                }
+            });
         }
 
         init();
@@ -1694,6 +1807,29 @@
         </div>
         <div id="popout-text" class="text-xs bg-gray-800 p-2 rounded-md whitespace-pre-wrap max-h-40 overflow-y-auto"></div>
         <div id="popout-flavour" class="text-xs text-gray-400 italic"></div>
+    </div>
+
+    <div id="import-review-modal" class="hidden fixed inset-0 bg-black/80 z-50 flex flex-col p-4">
+        <div class="bg-gray-800 rounded-lg max-w-7xl w-full max-h-full mx-auto flex flex-col p-6 shadow-2xl border border-indigo-500">
+            <div class="flex justify-between items-center mb-4 flex-shrink-0">
+                <h2 class="text-2xl font-bold text-indigo-300">Review Scryfall Import</h2>
+                <button id="import-review-close" class="text-3xl font-light text-gray-400 hover:text-white leading-none">&times;</button>
+            </div>
+            <div class="mb-4 flex-shrink-0 flex justify-between items-center">
+                <span id="import-selection-count" class="text-gray-400">0 cards selected</span>
+                <div>
+                    <button id="import-select-all-btn" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg mr-2">Select All</button>
+                    <button id="import-deselect-all-btn" class="bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">Deselect All</button>
+                </div>
+            </div>
+            <div id="import-review-content" class="card-container flex-grow overflow-y-auto justify-center border-t border-b border-gray-700 py-4">
+                <!-- Fetched cards will be displayed here for selection -->
+            </div>
+            <div class="mt-4 flex-shrink-0 flex justify-end gap-4">
+                <button id="import-review-cancel" class="bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">Cancel</button>
+                <button id="import-review-confirm" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg">Add Selected to Collection</button>
+            </div>
+        </div>
     </div>
 </body>
 </html>
