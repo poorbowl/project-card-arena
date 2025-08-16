@@ -375,6 +375,59 @@
         <div id="popout-flavour" class="text-xs text-gray-400 italic"></div>
     </div>
 
+    <!-- NEW: Pop-out element for detailed card previews -->
+    <div id="card-popout" class="rounded-lg shadow-2xl p-2 space-y-2">
+        <div class="flex justify-between items-start">
+            <span id="popout-name" class="font-bold"></span>
+            <span id="popout-cost" class="text-sm flex gap-1 items-center"></span>
+        </div>
+        <img id="popout-img" src="" alt="Card Image" class="rounded-md">
+        <div class="flex justify-between items-center text-sm">
+            <span id="popout-type" class="font-semibold"></span>
+            <span id="popout-pt" class="font-bold"></span>
+        </div>
+        <div id="popout-text" class="text-xs bg-gray-800 p-2 rounded-md whitespace-pre-wrap max-h-40 overflow-y-auto"></div>
+        <div id="popout-flavour" class="text-xs text-gray-400 italic"></div>
+    </div>
+
+    <div id="import-review-modal" class="hidden fixed inset-0 bg-black/80 z-50 flex flex-col p-4">
+        <div class="bg-gray-800 rounded-lg max-w-7xl w-full max-h-full mx-auto flex flex-col p-6 shadow-2xl border border-indigo-500">
+            <div class="flex justify-between items-center mb-4 flex-shrink-0">
+                <h2 class="text-2xl font-bold text-indigo-300">Review Scryfall Import</h2>
+                <button id="import-review-close" class="text-3xl font-light text-gray-400 hover:text-white leading-none">&times;</button>
+            </div>
+            <div class="mb-4 flex-shrink-0 flex justify-between items-center">
+                <span id="import-selection-count" class="text-gray-400">0 cards selected</span>
+                <div>
+                    <button id="import-select-all-btn" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg mr-2">Select All</button>
+                    <button id="import-deselect-all-btn" class="bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">Deselect All</button>
+                </div>
+            </div>
+            <div id="import-review-content" class="card-container flex-grow overflow-y-auto justify-center border-t border-b border-gray-700 py-4">
+                <!-- Fetched cards will be displayed here for selection -->
+            </div>
+            <div class="mt-4 flex-shrink-0 flex justify-end gap-4">
+                <button id="import-review-cancel" class="bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">Cancel</button>
+                <button id="import-review-add-to-deck" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Add to Deck</button>
+                <button id="import-review-confirm" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg">Add Selected to Collection</button>
+            </div>
+        </div>
+    </div>
+    <div id="add-to-deck-modal" class="hidden fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4">
+    <div class="bg-gray-800 rounded-lg max-w-md w-full p-6 shadow-2xl border border-indigo-500">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-2xl font-bold text-indigo-300">Add to Deck(s)</h2>
+            <button id="add-to-deck-close-btn" class="text-3xl font-light text-gray-400 hover:text-white leading-none">&times;</button>
+        </div>
+        <p class="text-gray-400 mb-4">Choose one or more destination decks for the selected cards.</p>
+        <div id="deck-choice-list" class="space-y-3 max-h-64 overflow-y-auto border-t border-b border-gray-700 py-3">
+            <!-- Deck checkboxes will be dynamically inserted here -->
+        </div>
+        <div class="mt-4 flex justify-end">
+            <button id="add-to-deck-confirm-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">Confirm</button>
+        </div>
+    </div>
+</div>
     <script>
     // --- DOM Elements (Declared Globally) ---
     let cardCollectionEl, deckListEl, commanderListEl, deckCountEl, deckNameEl, saveDeckBtn, savedDecksEl,
@@ -388,7 +441,7 @@
         filterColorSelect, filterSourceSelect, prevPageBtn, nextPageBtn, pageInfoEl, toggleSelectModeBtn,
         selectionActionBar, selectionCountEl, deleteSelectedBtn, addSelectedToDeckBtn, cardPopoutEl,
         popoutNameEl, popoutCostEl, popoutImgEl, popoutTypeEl, popoutPtEl, popoutTextEl, popoutFlavourEl, 
-        importReviewAddToDeckBtn, addToDeckModal, addToDeckCloseBtn, deckChoiceList;
+        importReviewAddToDeckBtn, addToDeckModal, addToDeckCloseBtn, deckChoiceList, addToDeckConfirmBtn;
 
     // --- Global State ---
         let allCards = [];
@@ -1198,22 +1251,22 @@
             cardIdSet.forEach(cardId => {
                 const cardToAdd = cardSource.find(c => c[idField] === cardId);
                 if (cardToAdd) {
-                    // If it's from an import, we need to find the full card object from our main collection
                     const finalCard = allCards.find(c => c.name === cardToAdd.name);
-                    if(finalCard) currentDeck.push(finalCard);
+                    if (finalCard) currentDeck.push(finalCard);
                 }
             });
 
             showMessage(`Added ${cardIdSet.size} cards to the deck.`, false);
             renderDeckList();
+
+            // Close all modals and exit selection mode
+            addToDeckModal.classList.add('hidden');
             if (source === 'import') closeImportReviewModal();
             else toggleSelectMode();
         };
 
         const openAddToDeckModal = async (source = 'collection') => {
-            // Determine which set of selected cards to use
             const cardIdSet = (source === 'import') ? importSelectedCards : selectedCards;
-
             if (cardIdSet.size === 0) {
                 showMessage("No cards selected.", true);
                 return;
@@ -1221,26 +1274,33 @@
 
             deckChoiceList.innerHTML = ''; // Clear previous list
 
-            // Button for "Currently Assembling" deck
-            const assemblingDeckBtn = document.createElement('button');
-            assemblingDeckBtn.className = 'deck-select-button';
-            assemblingDeckBtn.textContent = 'Currently Assembling Deck';
-            assemblingDeckBtn.onclick = () => {
-                addSelectedToCurrentDeck(cardIdSet, source);
-                addToDeckModal.classList.add('hidden');
-            };
-            deckChoiceList.appendChild(assemblingDeckBtn);
+            // Temporarily hide the import modal if it's the source to fix the visual bug
+            if (source === 'import') {
+                importReviewModal.classList.add('hidden');
+            }
+            // Store the source so the close button knows what to do
+            addToDeckModal.dataset.source = source;
 
-            // Buttons for all saved decks
+            // --- NEW: Create checkboxes instead of buttons ---
+            // Option for "Currently Assembling" deck
+            deckChoiceList.innerHTML += `
+                <label class="flex items-center space-x-3 p-2 rounded-md hover:bg-gray-700 cursor-pointer">
+                    <input type="checkbox" value="__current" class="deck-checkbox h-5 w-5 rounded bg-gray-600 border-gray-500 text-indigo-600 focus:ring-indigo-500">
+                    <span class="text-white">Currently Assembling Deck</span>
+                </label>
+            `;
+
+            // Options for saved decks
             try {
                 const snapshot = await db.collection('users').doc(myUserId).collection('decks').get();
                 snapshot.forEach(doc => {
                     const deckName = doc.id;
-                    const deckBtn = document.createElement('button');
-                    deckBtn.className = 'deck-select-button';
-                    deckBtn.textContent = deckName;
-                    deckBtn.onclick = () => addSelectedToSavedDeck(deckName, cardIdSet, source);
-                    deckChoiceList.appendChild(deckBtn);
+                    deckChoiceList.innerHTML += `
+                        <label class="flex items-center space-x-3 p-2 rounded-md hover:bg-gray-700 cursor-pointer">
+                            <input type="checkbox" value="${deckName}" class="deck-checkbox h-5 w-5 rounded bg-gray-600 border-gray-500 text-indigo-600 focus:ring-indigo-500">
+                            <span class="text-white">${deckName}</span>
+                        </label>
+                    `;
                 });
             } catch (error) {
                 console.error("Error fetching decks for modal:", error);
@@ -1249,30 +1309,60 @@
             addToDeckModal.classList.remove('hidden');
         };
 
-        const addSelectedToSavedDeck = async (deckName, cardIdSet, source) => {
+        const handleConfirmAddToDecks = async () => {
+            const source = addToDeckModal.dataset.source || 'collection';
+            const cardIdSet = (source === 'import') ? importSelectedCards : selectedCards;
             const cardSource = (source === 'import') ? fetchedCardsData : allCards;
             const idField = (source === 'import') ? 'name' : 'id';
+
+            const selectedDecks = Array.from(deckChoiceList.querySelectorAll('.deck-checkbox:checked')).map(cb => cb.value);
+
+            if (selectedDecks.length === 0) {
+                showMessage("No destination decks were selected.", true);
+                return;
+            }
 
             const cardIdsToAdd = [];
             cardIdSet.forEach(cardId => {
                 const card = cardSource.find(c => c[idField] === cardId);
                 if (card) {
                     const finalCard = allCards.find(c => c.name === card.name);
-                    if(finalCard) cardIdsToAdd.push(finalCard.id);
+                    if (finalCard) cardIdsToAdd.push(finalCard.id);
                 }
             });
 
-            if (cardIdsToAdd.length === 0) return;
-
-            try {
-                const deckRef = db.collection('users').doc(myUserId).collection('decks').doc(deckName);
-                await deckRef.update({
-                    cardIds: firebase.firestore.FieldValue.arrayUnion(...cardIdsToAdd)
-                });
-                showMessage(`Added ${cardIdsToAdd.length} cards to "${deckName}".`, false);
-            } catch (error) {
-                console.error(`Error adding cards to ${deckName}:`, error);
+            if (cardIdsToAdd.length === 0) {
+                showMessage("Could not find selected cards in the main collection.", true);
+                return;
             }
+
+            // Handle adding to the "Currently Assembling" deck
+            if (selectedDecks.includes('__current')) {
+                cardIdsToAdd.forEach(id => {
+                    const cardToAdd = allCards.find(c => c.id === id);
+                    if(cardToAdd) currentDeck.push(cardToAdd);
+                });
+                renderDeckList();
+            }
+
+            // Handle adding to saved decks
+            const savedDeckNames = selectedDecks.filter(name => name !== '__current');
+            if (savedDeckNames.length > 0) {
+                try {
+                    const batch = db.batch();
+                    savedDeckNames.forEach(deckName => {
+                        const deckRef = db.collection('users').doc(myUserId).collection('decks').doc(deckName);
+                        batch.update(deckRef, {
+                            cardIds: firebase.firestore.FieldValue.arrayUnion(...cardIdsToAdd)
+                        });
+                    });
+                    await batch.commit();
+                } catch (error) {
+                    console.error(`Error adding cards to saved decks:`, error);
+                }
+            }
+
+            showMessage(`Added ${cardIdsToAdd.length} cards to ${selectedDecks.length} deck(s).`, false);
 
             if (source === 'import') closeImportReviewModal();
             else toggleSelectMode();
@@ -1720,10 +1810,8 @@
         async function init() {
             firebase.auth().onAuthStateChanged(async (user) => {
                 if (user) {
-                    // User is signed in.
                     myUserId = user.uid;
                     console.log("DEBUG: User signed in with UID:", myUserId);
-
                     try {
                         // --- ASSIGN ALL DOM ELEMENTS ---
                         cardCollectionEl = document.getElementById('cardCollection');
@@ -1794,6 +1882,7 @@
                         addToDeckModal = document.getElementById('add-to-deck-modal');
                         addToDeckCloseBtn = document.getElementById('add-to-deck-close-btn');
                         deckChoiceList = document.getElementById('deck-choice-list');
+                        addToDeckConfirmBtn = document.getElementById('add-to-deck-confirm-btn');
 
                         // --- ATTACH ALL EVENT LISTENERS ---
                         const tabBtns = document.querySelectorAll('.tab-button');
@@ -1853,7 +1942,12 @@
                         toggleSelectModeBtn.addEventListener('click', toggleSelectMode);
                         deleteSelectedBtn.addEventListener('click', handleDeleteSelected);
                         addSelectedToDeckBtn.addEventListener('click', () => openAddToDeckModal('collection'));
-                        addToDeckCloseBtn.addEventListener('click', () => addToDeckModal.classList.add('hidden'));
+                        addToDeckCloseBtn.addEventListener('click', () => {
+                            addToDeckModal.classList.add('hidden');
+                            if (addToDeckModal.dataset.source === 'import') {
+                                importReviewModal.classList.remove('hidden');
+                            }
+                        });
                         importReviewClose.addEventListener('click', closeImportReviewModal);
                         importReviewCancel.addEventListener('click', closeImportReviewModal);
                         importReviewConfirm.addEventListener('click', () => handleConfirmImport(false));
@@ -1873,6 +1967,8 @@
                             });
                         });
 
+                        addToDeckConfirmBtn.addEventListener('click', handleConfirmAddToDecks);
+
                         // --- INITIAL LOAD ---
                         await loadAllCardsFromFirebase();
                         await renderSavedDecks();
@@ -1883,7 +1979,6 @@
                         document.body.innerHTML = `<div class="text-red-400 p-8">Could not connect to the server. Please check the console and refresh the page. Error: ${error.message}</div>`;
                     }
                 } else {
-                    // No user is signed in. Redirect to the login page.
                     window.location.href = 'index.html';
                 }
             });
@@ -1891,55 +1986,5 @@
 
         init();
     </script>
-    <!-- NEW: Pop-out element for detailed card previews -->
-    <div id="card-popout" class="rounded-lg shadow-2xl p-2 space-y-2">
-        <div class="flex justify-between items-start">
-            <span id="popout-name" class="font-bold"></span>
-            <span id="popout-cost" class="text-sm flex gap-1 items-center"></span>
-        </div>
-        <img id="popout-img" src="" alt="Card Image" class="rounded-md">
-        <div class="flex justify-between items-center text-sm">
-            <span id="popout-type" class="font-semibold"></span>
-            <span id="popout-pt" class="font-bold"></span>
-        </div>
-        <div id="popout-text" class="text-xs bg-gray-800 p-2 rounded-md whitespace-pre-wrap max-h-40 overflow-y-auto"></div>
-        <div id="popout-flavour" class="text-xs text-gray-400 italic"></div>
-    </div>
-
-    <div id="import-review-modal" class="hidden fixed inset-0 bg-black/80 z-50 flex flex-col p-4">
-        <div class="bg-gray-800 rounded-lg max-w-7xl w-full max-h-full mx-auto flex flex-col p-6 shadow-2xl border border-indigo-500">
-            <div class="flex justify-between items-center mb-4 flex-shrink-0">
-                <h2 class="text-2xl font-bold text-indigo-300">Review Scryfall Import</h2>
-                <button id="import-review-close" class="text-3xl font-light text-gray-400 hover:text-white leading-none">&times;</button>
-            </div>
-            <div class="mb-4 flex-shrink-0 flex justify-between items-center">
-                <span id="import-selection-count" class="text-gray-400">0 cards selected</span>
-                <div>
-                    <button id="import-select-all-btn" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg mr-2">Select All</button>
-                    <button id="import-deselect-all-btn" class="bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">Deselect All</button>
-                </div>
-            </div>
-            <div id="import-review-content" class="card-container flex-grow overflow-y-auto justify-center border-t border-b border-gray-700 py-4">
-                <!-- Fetched cards will be displayed here for selection -->
-            </div>
-            <div class="mt-4 flex-shrink-0 flex justify-end gap-4">
-                <button id="import-review-cancel" class="bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">Cancel</button>
-                <button id="import-review-add-to-deck" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Add to Deck</button>
-                <button id="import-review-confirm" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg">Add Selected to Collection</button>
-            </div>
-        </div>
-    </div>
-    <div id="add-to-deck-modal" class="hidden fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4">
-        <div class="bg-gray-800 rounded-lg max-w-md w-full p-6 shadow-2xl border border-indigo-500">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-2xl font-bold text-indigo-300">Add to Deck</h2>
-                <button id="add-to-deck-close-btn" class="text-3xl font-light text-gray-400 hover:text-white leading-none">&times;</button>
-            </div>
-            <p class="text-gray-400 mb-4">Choose a destination deck for the selected cards.</p>
-            <div id="deck-choice-list" class="space-y-2">
-                <!-- Deck buttons will be dynamically inserted here -->
-            </div>
-        </div>
-    </div>
 </body>
 </html>
