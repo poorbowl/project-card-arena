@@ -233,7 +233,22 @@
 
     <div class="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div class="lg:col-span-2">
-            <h2 class="text-2xl font-semibold mb-4">My Card Collection</h2>
+            // Add new buttons to toggle view
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-semibold">My Card Collection</h2>
+                <div id="view-toggle-buttons" class="flex items-center gap-2">
+                    <button id="grid-view-btn" class="p-2 rounded-md bg-indigo-600 text-white">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                        </svg>
+                    </button>
+                    <button id="list-view-btn" class="p-2 rounded-md bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-white">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
             
             <!-- Filter and Sort Controls -->
             <div class="bg-gray-900 p-4 rounded-lg mb-4 flex flex-wrap gap-4 items-center">
@@ -441,7 +456,8 @@
         filterColorSelect, filterSourceSelect, prevPageBtn, nextPageBtn, pageInfoEl, toggleSelectModeBtn,
         selectionActionBar, selectionCountEl, deleteSelectedBtn, addSelectedToDeckBtn, cardPopoutEl,
         popoutNameEl, popoutCostEl, popoutImgEl, popoutTypeEl, popoutPtEl, popoutTextEl, popoutFlavourEl, 
-        importReviewAddToDeckBtn, addToDeckModal, addToDeckCloseBtn, deckChoiceList, addToDeckConfirmBtn;
+        importReviewAddToDeckBtn, addToDeckModal, addToDeckCloseBtn, deckChoiceList, addToDeckConfirmBtn,
+        gridViewBtn, listViewBtn;
 
     // --- Global State ---
         let allCards = [];
@@ -457,6 +473,7 @@
         let importSelectedCards = new Set();
         let currentPage = 1;
         const cardsPerPage = 20; // You can change this number to show more or fewer cards
+        let currentView = 'grid'; // Can be 'grid' or 'list'
 
         // --- MESSAGE FUNCTIONS ---
         const showMessage = (message, isError = true, area = 'create') => {
@@ -661,6 +678,67 @@
             container.appendChild(cardWrapper);
         };
 
+        const renderCardAsListItem = (card, container) => {
+            const listItem = document.createElement('div');
+            listItem.className = 'p-2 bg-gray-700 rounded-lg flex items-center gap-4 transition-all border-2 border-transparent';
+
+            // --- Add a highlight if the card is selected ---
+            if (selectedCards.has(card.id)) {
+                listItem.classList.replace('border-transparent', 'border-blue-500');
+            }
+
+            // Clickable area for selection/adding to deck
+            listItem.addEventListener('click', () => {
+                if (isSelectMode) {
+                    if (selectedCards.has(card.id)) {
+                        selectedCards.delete(card.id);
+                        listItem.classList.replace('border-blue-500', 'border-transparent');
+                    } else {
+                        selectedCards.add(card.id);
+                        listItem.classList.replace('border-transparent', 'border-blue-500');
+                    }
+                    selectionCountEl.textContent = `${selectedCards.size} cards selected`;
+                } else {
+                    addCardToDeck(card);
+                }
+            });
+
+            const name = document.createElement('span');
+            name.textContent = card.name;
+            name.className = 'flex-grow font-semibold text-white truncate';
+
+            const type = document.createElement('span');
+            type.textContent = card.type;
+            type.className = 'w-32 flex-shrink-0 text-gray-400 text-sm truncate';
+
+            const cost = document.createElement('div');
+            cost.className = 'w-24 flex-shrink-0 flex justify-end';
+            cost.innerHTML = parseManaCost(card.cost, 'mana-symbol');
+
+            const buttonBar = document.createElement('div');
+            buttonBar.className = 'flex gap-2';
+
+            const editBtn = document.createElement('button');
+            editBtn.textContent = 'Edit';
+            editBtn.className = 'text-xs bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded';
+            editBtn.onclick = (e) => { e.stopPropagation(); populateFormForEdit(card.id); };
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = 'Delete';
+            deleteBtn.className = 'text-xs bg-red-600 hover:bg-red-700 px-2 py-1 rounded';
+            deleteBtn.onclick = (e) => { e.stopPropagation(); deleteCard(card.id); };
+
+            buttonBar.appendChild(editBtn);
+            buttonBar.appendChild(deleteBtn);
+
+            listItem.appendChild(name);
+            listItem.appendChild(type);
+            listItem.appendChild(cost);
+            listItem.appendChild(buttonBar);
+
+            container.appendChild(listItem);
+        };
+
         /**
          * Helper function to determine a card's color identity from its mana cost.
          */
@@ -681,45 +759,36 @@
         const renderFilteredCollection = () => {
             let filteredCards = [...allCards];
 
-            // --- All the existing filter logic stays the same ---
+            // --- Filtering and Sorting logic remains the same ---
             const nameQuery = filterNameInput.value.toLowerCase();
-            if (nameQuery) {
-                filteredCards = filteredCards.filter(card => card.name.toLowerCase().includes(nameQuery));
-            }
+            if (nameQuery) filteredCards = filteredCards.filter(card => card.name.toLowerCase().includes(nameQuery));
             const typeQuery = filterTypeSelect.value;
-            if (typeQuery) {
-                filteredCards = filteredCards.filter(card => card.type === typeQuery);
-            }
+            if (typeQuery) filteredCards = filteredCards.filter(card => card.type === typeQuery);
             const colorQuery = filterColorSelect.value;
-            if (colorQuery) {
-                filteredCards = filteredCards.filter(card => {
-                    const identity = getCardColorIdentity(card.cost);
-                    return identity.includes(colorQuery);
-                });
-            }
+            if (colorQuery) filteredCards = filteredCards.filter(card => getCardColorIdentity(card.cost).includes(colorQuery));
             const sourceQuery = filterSourceSelect.value;
-            if (sourceQuery) {
-                filteredCards = filteredCards.filter(card => card.source === sourceQuery);
-            }
+            if (sourceQuery) filteredCards = filteredCards.filter(card => card.source === sourceQuery);
             const sortQuery = filterSortSelect.value;
-            if (sortQuery === 'name_asc') {
-                filteredCards.sort((a, b) => a.name.localeCompare(b.name));
-            } else if (sortQuery === 'name_desc') {
-                filteredCards.sort((a, b) => b.name.localeCompare(a.name));
-            }
+            if (sortQuery === 'name_asc') filteredCards.sort((a, b) => a.name.localeCompare(b.name));
+            else if (sortQuery === 'name_desc') filteredCards.sort((a, b) => b.name.localeCompare(a.name));
 
-            // --- NEW PAGINATION LOGIC ---
+            // --- Pagination logic remains the same ---
             const totalPages = Math.ceil(filteredCards.length / cardsPerPage);
-            if (currentPage > totalPages && totalPages > 0) {
-                currentPage = totalPages; // Go to last page if current page is out of bounds
-            }
-
+            if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
             const startIndex = (currentPage - 1) * cardsPerPage;
             const endIndex = startIndex + cardsPerPage;
             const paginatedCards = filteredCards.slice(startIndex, endIndex);
 
             cardCollectionEl.innerHTML = '';
-            paginatedCards.forEach(card => renderCard(card, cardCollectionEl));
+
+            // --- NEW: Logic to switch between views ---
+            if (currentView === 'grid') {
+                cardCollectionEl.className = 'bg-gray-900 p-4 rounded-lg min-h-[300px] grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4';
+                paginatedCards.forEach(card => renderCard(card, cardCollectionEl));
+            } else { // 'list' view
+                cardCollectionEl.className = 'bg-gray-900 p-4 rounded-lg min-h-[300px] flex flex-col gap-2';
+                paginatedCards.forEach(card => renderCardAsListItem(card, cardCollectionEl));
+            }
 
             // Update pagination controls
             pageInfoEl.textContent = `Page ${currentPage} of ${totalPages || 1}`;
@@ -1883,6 +1952,8 @@
                         addToDeckCloseBtn = document.getElementById('add-to-deck-close-btn');
                         deckChoiceList = document.getElementById('deck-choice-list');
                         addToDeckConfirmBtn = document.getElementById('add-to-deck-confirm-btn');
+                        gridViewBtn = document.getElementById('grid-view-btn');
+                        listViewBtn = document.getElementById('list-view-btn');
 
                         // --- ATTACH ALL EVENT LISTENERS ---
                         const tabBtns = document.querySelectorAll('.tab-button');
@@ -1905,6 +1976,29 @@
                             creatureFields.classList.toggle('hidden', selectedType !== 'Creature');
                             planeswalkerFields.classList.toggle('hidden', selectedType !== 'Planeswalker');
                         });
+
+                        gridViewBtn.addEventListener('click', () => {
+                            if (currentView === 'list') {
+                                currentView = 'grid';
+                                gridViewBtn.classList.add('bg-indigo-600', 'text-white');
+                                gridViewBtn.classList.remove('bg-gray-700', 'text-gray-400', 'hover:bg-gray-600');
+                                listViewBtn.classList.add('bg-gray-700', 'text-gray-400', 'hover:bg-gray-600');
+                                listViewBtn.classList.remove('bg-indigo-600', 'text-white');
+                                renderFilteredCollection();
+                            }
+                        });
+
+                        listViewBtn.addEventListener('click', () => {
+                            if (currentView === 'grid') {
+                                currentView = 'list';
+                                listViewBtn.classList.add('bg-indigo-600', 'text-white');
+                                listViewBtn.classList.remove('bg-gray-700', 'text-gray-400', 'hover:bg-gray-600');
+                                gridViewBtn.classList.add('bg-gray-700', 'text-gray-400', 'hover:bg-gray-600');
+                                gridViewBtn.classList.remove('bg-indigo-600', 'text-white');
+                                renderFilteredCollection();
+                            }
+                        });
+
                         saveCardBtn.addEventListener('click', handleSaveCard);
                         cancelEditBtn.addEventListener('click', resetForm);
                         saveDeckBtn.addEventListener('click', handleSaveDeck);
