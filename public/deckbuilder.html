@@ -233,7 +233,7 @@
 
     <div class="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div class="lg:col-span-2">
-            // Add new buttons to toggle view
+            
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-2xl font-semibold">My Card Collection</h2>
                 <div id="view-toggle-buttons" class="flex items-center gap-2">
@@ -273,6 +273,16 @@
                     <option value="C">Colorless</option>
                     <option value="M">Multi-Color</option>
                 </select>
+                <div class="flex items-center bg-gray-700 border border-gray-600 rounded-md shadow-sm">
+                    <select id="manaValueOperator" class="bg-gray-700 rounded-l-md py-2 pl-3 pr-1 border-r border-gray-600 text-white focus:outline-none">
+                        <option value="=">=</option>
+                        <option value="<"><</option>
+                        <option value="<="><=</option>
+                        <option value=">">></option>
+                        <option value=">=">>=</option>
+                    </select>
+                    <input type="number" id="manaValueFilter" placeholder="MV" class="w-16 bg-gray-700 py-2 px-2 text-white focus:outline-none rounded-r-md">
+                </div>
                 <select id="filterSource" class="bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
                     <option value="">All Sources</option>
                     <option value="custom">User-Created</option>
@@ -281,6 +291,8 @@
                 <select id="filterSort" class="bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
                     <option value="name_asc">Sort: Name (A-Z)</option>
                     <option value="name_desc">Sort: Name (Z-A)</option>
+                    <option value="mv_asc">Sort: Mana Value (Low-High)</option>
+                    <option value="mv_desc">Sort: Mana Value (High-Low)</option>
                 </select>
                 <div class="flex-grow"></div> <!-- This is a spacer to push the new button to the right -->
                 <button id="toggle-select-mode-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
@@ -457,7 +469,7 @@
         selectionActionBar, selectionCountEl, deleteSelectedBtn, addSelectedToDeckBtn, cardPopoutEl,
         popoutNameEl, popoutCostEl, popoutImgEl, popoutTypeEl, popoutPtEl, popoutTextEl, popoutFlavourEl, 
         importReviewAddToDeckBtn, addToDeckModal, addToDeckCloseBtn, deckChoiceList, addToDeckConfirmBtn,
-        gridViewBtn, listViewBtn;
+        gridViewBtn, listViewBtn, manaValueOperator, manaValueFilter;
 
     // --- Global State ---
         let allCards = [];
@@ -756,41 +768,86 @@
             return Array.from(colors);
         };
 
+        const getManaValue = (manaCost) => {
+            if (!manaCost) return 0;
+            let mv = 0;
+            const symbolRegex = /\{(.+?)\}/g;
+            let match;
+            while ((match = symbolRegex.exec(manaCost)) !== null) {
+                const symbol = match[1];
+                const numericValue = parseInt(symbol, 10);
+                if (!isNaN(numericValue)) {
+                    mv += numericValue; // Adds numbers like {2}, {16}, etc.
+                } else if (symbol.includes('/')) {
+                    mv += 1; // Hybrid and Phyrexian mana count as 1.
+                } else if (symbol !== 'X' && symbol !== 'Y' && symbol !== 'Z') {
+                    mv += 1; // Regular colored pips count as 1.
+                }
+            }
+            return mv;
+        };
+
         const renderFilteredCollection = () => {
             let filteredCards = [...allCards];
 
-            // --- Filtering and Sorting logic remains the same ---
+            // --- Add Mana Value to each card for sorting/filtering ---
+            filteredCards.forEach(card => {
+                card.mv = getManaValue(card.cost);
+            });
+
+            // --- Filtering Logic ---
             const nameQuery = filterNameInput.value.toLowerCase();
             if (nameQuery) filteredCards = filteredCards.filter(card => card.name.toLowerCase().includes(nameQuery));
+
             const typeQuery = filterTypeSelect.value;
             if (typeQuery) filteredCards = filteredCards.filter(card => card.type === typeQuery);
+
             const colorQuery = filterColorSelect.value;
             if (colorQuery) filteredCards = filteredCards.filter(card => getCardColorIdentity(card.cost).includes(colorQuery));
+
             const sourceQuery = filterSourceSelect.value;
             if (sourceQuery) filteredCards = filteredCards.filter(card => card.source === sourceQuery);
-            const sortQuery = filterSortSelect.value;
-            if (sortQuery === 'name_asc') filteredCards.sort((a, b) => a.name.localeCompare(b.name));
-            else if (sortQuery === 'name_desc') filteredCards.sort((a, b) => b.name.localeCompare(a.name));
 
-            // --- Pagination logic remains the same ---
+            // --- NEW Mana Value Filter Logic ---
+            const mvValue = parseInt(manaValueFilter.value, 10);
+            if (!isNaN(mvValue)) {
+                const operator = manaValueOperator.value;
+                filteredCards = filteredCards.filter(card => {
+                    if (operator === '=') return card.mv === mvValue;
+                    if (operator === '<') return card.mv < mvValue;
+                    if (operator === '<=') return card.mv <= mvValue;
+                    if (operator === '>') return card.mv > mvValue;
+                    if (operator === '>=') return card.mv >= mvValue;
+                    return true;
+                });
+            }
+
+            // --- Sorting Logic ---
+            const sortQuery = filterSortSelect.value;
+            if (sortQuery === 'name_asc') {
+                filteredCards.sort((a, b) => a.name.localeCompare(b.name));
+            } else if (sortQuery === 'name_desc') {
+                filteredCards.sort((a, b) => b.name.localeCompare(a.name));
+            } else if (sortQuery === 'mv_asc') {
+                filteredCards.sort((a, b) => a.mv - b.mv || a.name.localeCompare(b.name));
+            } else if (sortQuery === 'mv_desc') {
+                filteredCards.sort((a, b) => b.mv - a.mv || a.name.localeCompare(b.name));
+            }
+
+            // --- Pagination and Rendering ---
             const totalPages = Math.ceil(filteredCards.length / cardsPerPage);
             if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
             const startIndex = (currentPage - 1) * cardsPerPage;
             const endIndex = startIndex + cardsPerPage;
             const paginatedCards = filteredCards.slice(startIndex, endIndex);
-
             cardCollectionEl.innerHTML = '';
-
-            // --- NEW: Logic to switch between views ---
             if (currentView === 'grid') {
                 cardCollectionEl.className = 'bg-gray-900 p-4 rounded-lg min-h-[300px] grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4';
                 paginatedCards.forEach(card => renderCard(card, cardCollectionEl));
-            } else { // 'list' view
+            } else {
                 cardCollectionEl.className = 'bg-gray-900 p-4 rounded-lg min-h-[300px] flex flex-col gap-2';
                 paginatedCards.forEach(card => renderCardAsListItem(card, cardCollectionEl));
             }
-
-            // Update pagination controls
             pageInfoEl.textContent = `Page ${currentPage} of ${totalPages || 1}`;
             prevPageBtn.disabled = currentPage === 1;
             nextPageBtn.disabled = currentPage === totalPages || totalPages === 0;
@@ -1954,6 +2011,8 @@
                         addToDeckConfirmBtn = document.getElementById('add-to-deck-confirm-btn');
                         gridViewBtn = document.getElementById('grid-view-btn');
                         listViewBtn = document.getElementById('list-view-btn');
+                        manaValueOperator = document.getElementById('manaValueOperator');
+                        manaValueFilter = document.getElementById('manaValueFilter');
 
                         // --- ATTACH ALL EVENT LISTENERS ---
                         const tabBtns = document.querySelectorAll('.tab-button');
@@ -2023,6 +2082,8 @@
                         filterSortSelect.addEventListener('change', renderFilteredCollection);
                         filterColorSelect.addEventListener('change', renderFilteredCollection);
                         filterSourceSelect.addEventListener('change', renderFilteredCollection);
+                        manaValueOperator.addEventListener('change', renderFilteredCollection);
+                        manaValueFilter.addEventListener('input', renderFilteredCollection);
                         prevPageBtn.addEventListener('click', () => {
                             if (currentPage > 1) {
                                 currentPage--;
