@@ -333,6 +333,17 @@
         body[data-chat-state="closed"] #chat-container {
             display: none;
         }
+        @keyframes roll-animation {
+            0% { transform: scale(1); }
+            25% { transform: scale(1.2) rotate(15deg); }
+            50% { transform: scale(1); }
+            75% { transform: scale(1.2) rotate(-15deg); }
+            100% { transform: scale(1); }
+        }
+
+        .dice-rolling {
+            animation: roll-animation 0.5s ease-in-out;
+        }
     </style>
 </head>
 <body data-chat-state="closed" class="text-white">
@@ -741,6 +752,16 @@
                                         <div id="turn-indicator" class="font-bold text-sm mb-1"></div>
                                         <button id="passTurnBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs py-1 rounded-lg disabled:bg-gray-600 disabled:cursor-not-allowed">Pass Turn</button>
                                     </div>
+
+                                    <!-- NEW D20 DICE ROLLER ELEMENT -->
+                                    <div id="dice-roller" class="my-2 flex flex-col items-center cursor-pointer group">
+                                        <div id="d20-icon" class="w-12 h-12 border-2 border-gray-500 rounded-lg flex items-center justify-center text-2xl font-bold group-hover:bg-gray-700 transition-colors">
+                                            <span id="d20-result">20</span>
+                                        </div>
+                                        <span class="text-xs text-gray-500 mt-1">Roll d20</span>
+                                    </div>
+                                    <!-- END OF NEW ELEMENT -->
+
                                     <div class="flex flex-col items-center">
                                         <button id="create-token-btn" class="w-full mb-2 bg-indigo-600 text-white text-xs py-1 rounded">Create Token</button>
                                         <span class="player-name-display font-bold text-gray-400 text-xs md:text-sm">${playerState.name || 'YOU'}</span>
@@ -1565,6 +1586,43 @@
                 });
             }
 
+            function handleDiceRoll() {
+                const d20Icon = document.getElementById('d20-icon');
+                const d20ResultEl = document.getElementById('d20-result');
+                if (!d20Icon || !d20ResultEl) return;
+
+                // Animate the dice
+                d20Icon.classList.add('dice-rolling');
+
+                // Temporarily show random numbers for a flashing effect
+                let flashes = 0;
+                const flashInterval = setInterval(() => {
+                    d20ResultEl.textContent = Math.floor(Math.random() * 20) + 1;
+                    flashes++;
+                    if (flashes > 10) { // Stop after 10 flashes (500ms)
+                        clearInterval(flashInterval);
+
+                        // Show the final, true result
+                        const finalResult = Math.floor(Math.random() * 20) + 1;
+                        d20ResultEl.textContent = finalResult;
+
+                        // Send the result to the chat for everyone to see
+                        const playerName = gameState.players[myPlayerId]?.name || 'Player';
+                        const message = {
+                            sender: 'Game',
+                            text: `${playerName} rolled a ${finalResult} on a d20.`,
+                            timestamp: firebase.database.ServerValue.TIMESTAMP
+                        };
+                        gameRef.child('chat').push(message);
+                    }
+                }, 50);
+
+                // Remove the animation class after it finishes
+                setTimeout(() => {
+                    d20Icon.classList.remove('dice-rolling');
+                }, 500);
+            }
+
             function handleSendMessage(event) {
                 if (event.key === 'Enter') {
                     const messageText = chatInputEl.value.trim();
@@ -1606,6 +1664,13 @@
                     handlePassTurn();
                     return;
                 }
+
+                const diceRoller = event.target.closest('#dice-roller');
+                if (diceRoller) {
+                    handleDiceRoll();
+                    return;
+                }
+
                 const removeButton = event.target.closest('.remove-player-btn');
                 if (removeButton) {
                     const playerIdToRemove = removeButton.dataset.removePlayerId;
