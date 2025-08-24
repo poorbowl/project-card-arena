@@ -341,17 +341,6 @@
         animation: roll-animation 0.5s ease-in-out;
     }
 
-    .player-area {
-    min-height: 0; /* Prevents the main player grid cell from expanding */
-    }
-    #battlefield-wrapper {
-        display: flex;       /* Makes the battlefield a flex container */
-        flex-direction: column; /* Stacks its children (title and card area) vertically */
-    }
-    #battlefield-wrapper > .card-container {
-        flex-grow: 1;      /* Allows the card container to fill the available space */
-        overflow-y: auto;  /* Adds a scrollbar ONLY when the cards overflow */
-    }
 </style>
 </head>
 <body data-chat-state="closed" class="text-white">
