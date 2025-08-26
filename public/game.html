@@ -748,7 +748,7 @@
                                 <div class="zone-title">BATTLEFIELD</div>
                                 <div id="${playerId}-battlefield-cards" data-zone-name="battlefield" class="card-container"></div>
                             </div>
-                            <div class="flex-shrink-0 w-24 md:w-32 flex flex-col items-center ${isMe ? 'justify-between' : 'justify-center'} bg-gray-800/80 rounded-lg p-2">
+                            <div class="flex-shrink-0 w-24 md:w-32 flex flex-col items-center justify-between bg-gray-800/80 rounded-lg p-2">
                                 ${isMe ? `
                                     <div class="w-full text-center">
                                         <div id="turn-indicator" class="font-bold text-sm mb-1"></div>
@@ -779,15 +779,19 @@
                                         </div>
                                     </div>
                                 ` : `
-                                    <div class="flex items-center justify-between w-full">
-                                        <span class="player-name-display font-bold text-gray-400 text-xs md:text-sm">${playerState.name || 'OPPONENT'}</span>
+                                    <div class="w-full text-center">
+                                        <div class="flex items-center justify-between w-full">
+                                            <span class="player-name-display font-bold text-gray-400 text-xs md:text-sm">${playerState.name || 'OPPONENT'}</span>
+                                            ${myPlayerId === 'p1' ? `<button data-remove-player-id="${playerId}" class="remove-player-btn ml-2 text-red-500 font-bold">X</button>` : ''}
+                                        </div>
                                         <span id="${playerId}-hand-size" class="text-xs text-gray-400">Hand: 0</span>
-                                        ${myPlayerId === 'p1' ? `<button data-remove-player-id="${playerId}" class="remove-player-btn ml-2 text-red-500 font-bold">X</button>` : ''}
                                     </div>
-                                    <input type="number" id="${playerId}-life-total" class="life-total-input text-4xl lg:text-5xl font-bold" value="40" readonly>
-                                    <div class="flex gap-1 md:gap-2 mt-2">
-                                        <button data-player-id="${playerId}" data-action="decrement" class="bg-red-600 w-8 h-8 md:w-10 md:h-10 text-xl md:text-2xl rounded-full">-</button>
-                                        <button data-player-id="${playerId}" data-action="increment" class="bg-green-600 w-8 h-8 md:w-10 md:h-10 text-xl md:text-2xl rounded-full">+</button>
+                                    <div class="flex flex-col items-center">
+                                        <input type="number" id="${playerId}-life-total" class="life-total-input text-4xl lg:text-5xl font-bold" value="40" readonly>
+                                        <div class="flex gap-1 md:gap-2 mt-2">
+                                            <button data-player-id="${playerId}" data-action="decrement" class="bg-red-600 w-8 h-8 md:w-10 md:h-10 text-xl md:text-2xl rounded-full">-</button>
+                                            <button data-player-id="${playerId}" data-action="increment" class="bg-green-600 w-8 h-8 md:w-10 md:h-10 text-xl md:text-2xl rounded-full">+</button>
+                                        </div>
                                     </div>
                                 `}
                             </div>
