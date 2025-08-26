@@ -221,6 +221,15 @@
         padding: 2px 6px;
         border-radius: 4px;
     }
+
+    .token .token-name, .token .text-xs {
+        background-color: rgba(17, 24, 39, 0.8); /* Dark, semi-transparent background */
+        padding: 2px 4px;
+        border-radius: 3px;
+        width: fit-content; /* Make the background only as wide as the text */
+        margin: 2px auto; /* Center the text blocks */
+    }
+
     #card-popout {
         width: 280px;
         background-color: #1f2937;
@@ -494,6 +503,15 @@
                 toGraveyard: []
             };
 
+            const COMMON_TOKEN_IMAGES = {
+                'Treasure': 'https://firebasestorage.googleapis.com/v0/b/project-card-arena.firebasestorage.app/o/tokens%2FTreasure%20Token.png?alt=media&token=2627be0b-c378-4d7a-b8fa-41efb35f57b7',
+                'Food': 'https://firebasestorage.googleapis.com/v0/b/project-card-arena.firebasestorage.app/o/tokens%2FFood%20Token.png?alt=media&token=87d31a1d-81ae-490f-b862-a9e48a95ebec',
+                'Clue': 'https://firebasestorage.googleapis.com/v0/b/project-card-arena.firebasestorage.app/o/tokens%2FClue%20Token.png?alt=media&token=8fc18b7a-328a-4672-8105-a584a23a8b1a',
+                '1/1 Human': 'https://firebasestorage.googleapis.com/v0/b/project-card-arena.firebasestorage.app/o/tokens%2FHuman%20Token.png?alt=media&token=6485390a-f9e5-4a4c-81c2-dfbe904fb2a6',
+                '1/1 Goblin': 'https://firebasestorage.googleapis.com/v0/b/project-card-arena.firebasestorage.app/o/tokens%2FGoblin%20Token.png?alt=media&token=e89e0554-6a91-4fad-bd84-b0453fadffc8',
+                '1/1 Elf Warrior': 'https://firebasestorage.googleapis.com/v0/b/project-card-arena.firebasestorage.app/o/tokens%2FElf%20Warrior%20Token.png?alt=media&token=9d1f1437-5323-4282-90ed-457bd3e65b7c',
+                '2/2 Zombie': 'https://firebasestorage.googleapis.com/v0/b/project-card-arena.firebasestorage.app/o/tokens%2FZombie%20Token.png?alt=media&token=52dc087a-eb03-4692-809b-899de3e98d30'
+            };
             const mainGridEl = document.querySelector('.main-grid');
             const handAreaEl = document.getElementById('main-player-hand-area');
             const handCardsEl = document.getElementById('main-player-hand-cards');
@@ -550,16 +568,21 @@
                 const el = document.createElement('div');
                 el.dataset.instanceId = card.instanceId;
                 el.className = 'card';
-                
+
+                // Handle image backgrounds for cards and tokens with images
+                if (card.imageUrl) {
+                    el.style.backgroundImage = `url(${card.imageUrl})`;
+                }
+
+                // If it's a token, add the text overlay elements
                 if (card.isToken) {
                     el.classList.add('token');
+                    // If there's no image, the text will appear on the default gray background
                     el.innerHTML = `
                         <div class="token-name">${card.name}</div>
                         <div class="text-xs">${card.text || ''}</div>
                         <div class="token-pt">${card.pt || ''}</div>
                     `;
-                } else {
-                    el.style.backgroundImage = `url(${card.imageUrl})`;
                 }
 
                 if (card.tapped) el.classList.add('tapped');
@@ -1758,13 +1781,55 @@
                 if(!selected) return;
                 let tokenData = {};
                 switch(selected) {
-                    case 'Treasure': tokenData = { name: 'Treasure', text: '{T}, Sacrifice this artifact: Add one mana of any color.'}; break;
-                    case 'Food': tokenData = { name: 'Food', text: '{2}, {T}, Sacrifice this artifact: You gain 3 life.'}; break;
-                    case 'Clue': tokenData = { name: 'Clue', text: '{2}, Sacrifice this artifact: Draw a card.'}; break;
-                    case '1/1 Human': tokenData = { name: 'Human', pt: '1/1'}; break;
-                    case '1/1 Goblin': tokenData = { name: 'Goblin', pt: '1/1'}; break;
-                    case '1/1 Elf Warrior': tokenData = { name: 'Elf Warrior', pt: '1/1'}; break;
-                    case '2/2 Zombie': tokenData = { name: 'Zombie', pt: '2/2'}; break;
+                    case 'Treasure':
+                    tokenData = { 
+                        name: 'Treasure', 
+                        text: '{T}, Sacrifice this artifact: Add one mana of any color.',
+                        imageUrl: COMMON_TOKEN_IMAGES['Treasure']
+                    };
+                    break;
+                    case 'Food':
+                    tokenData = { 
+                        name: 'Food', 
+                        text: '{2}, {T}, Sacrifice this artifact: You gain 3 life.',
+                        imageUrl: COMMON_TOKEN_IMAGES['Food']
+                    };
+                    break;
+                    case 'Clue':
+                    tokenData = { 
+                        name: 'Clue', 
+                        text: '{2}, Sacrifice this artifact: Draw a card.',
+                        imageUrl: COMMON_TOKEN_IMAGES['Clue']
+                    };
+                    break;
+                    case '1/1 Human':
+                    tokenData = { 
+                        name: 'Human',
+                        pt: '1/1',
+                        imageUrl: COMMON_TOKEN_IMAGES['1/1 Human']
+                    };
+                    break;
+                    case '1/1 Goblin':
+                    tokenData = { 
+                        name: 'Goblin',
+                        pt: '1/1',
+                        imageUrl: COMMON_TOKEN_IMAGES['1/1 Goblin']
+                    };
+                    break;
+                    case '1/1 Elf Warrior':
+                    tokenData = { 
+                        name: 'Elf Warrior',
+                        pt: '1/1',
+                        imageUrl: COMMON_TOKEN_IMAGES['1/1 Elf Warrior']
+                    };
+                    break;
+                    case '2/2 Zombie':
+                    tokenData = { 
+                        name: 'Zombie',
+                        pt: '2/2',
+                        imageUrl: COMMON_TOKEN_IMAGES['2/2 Zombie']
+                    };
+                    break;
                 }
                 if (Object.keys(tokenData).length > 0) {
                     createToken(tokenData);
