@@ -698,6 +698,11 @@
                     document.getElementById(`${playerId}-library`).querySelector('.zone-title').textContent = `LIBRARY (${(playerState.deck || []).length})`;
                     document.getElementById(`${playerId}-life-total`).value = playerState.life ?? 40;
 
+                    const handSizeEl = document.getElementById(`${playerId}-hand-size`);
+                    if (handSizeEl) {
+                        handSizeEl.textContent = `Hand: ${(playerState.hand || []).length}`;
+                    }
+
                     document.querySelectorAll(`#${playerId}-graveyard .card, #${playerId}-exile .card, #${playerId}-library .card, #${playerId}-commander .card`).forEach(c => c.remove());
                 });
 
@@ -761,7 +766,12 @@
 
                                     <div class="flex flex-col items-center">
                                         <button id="create-token-btn" class="w-full mb-2 bg-indigo-600 text-white text-xs py-1 rounded">Create Token</button>
-                                        <span class="player-name-display font-bold text-gray-400 text-xs md:text-sm">${playerState.name || 'YOU'}</span>
+                                        
+                                        <div class="flex items-center justify-between w-full">
+                                            <span class="player-name-display font-bold text-gray-400 text-xs md:text-sm">${playerState.name || 'YOU'}</span>
+                                            <span id="${playerId}-hand-size" class="text-xs text-gray-400">Hand: 0</span>
+                                        </div>
+
                                         <input type="number" id="${playerId}-life-total" class="life-total-input text-4xl lg:text-5xl font-bold" value="40">
                                         <div class="flex gap-1 md:gap-2 mt-2">
                                             <button data-player-id="${playerId}" data-action="decrement" class="bg-red-600 w-8 h-8 md:w-10 md:h-10 text-xl md:text-2xl rounded-full">-</button>
@@ -769,8 +779,9 @@
                                         </div>
                                     </div>
                                 ` : `
-                                    <div class="flex items-center">
+                                    <div class="flex items-center justify-between w-full">
                                         <span class="player-name-display font-bold text-gray-400 text-xs md:text-sm">${playerState.name || 'OPPONENT'}</span>
+                                        <span id="${playerId}-hand-size" class="text-xs text-gray-400">Hand: 0</span>
                                         ${myPlayerId === 'p1' ? `<button data-remove-player-id="${playerId}" class="remove-player-btn ml-2 text-red-500 font-bold">X</button>` : ''}
                                     </div>
                                     <input type="number" id="${playerId}-life-total" class="life-total-input text-4xl lg:text-5xl font-bold" value="40" readonly>
