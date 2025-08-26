@@ -170,6 +170,13 @@
         padding: 0.25rem 0.5rem;
         width: 100%;
     }
+
+    .context-submenu {
+        padding-left: 1rem; /* Indent the submenu items */
+        border-left: 2px solid #4f46e5; /* Add a visual indicator */
+        margin-left: 0.5rem;
+        margin-top: 0.25rem;
+    }
     .counter-badge-container {
         position: absolute;
         top: 2px;
@@ -910,70 +917,92 @@
             function showContextMenu(event) {
                 event.preventDefault();
                 hideContextMenu();
-            
+
                 const cardEl = event.currentTarget;
                 const instanceId = cardEl.dataset.instanceId;
                 const parentZoneEl = cardEl.closest('[data-zone-name]');
                 let parentZoneName = parentZoneEl ? parentZoneEl.dataset.zoneName : null;
                 
-                // FIX: Correctly identify when a card is in the library search modal
                 if (cardEl.closest('#library-search-modal')) {
                     parentZoneName = 'deck';
                 }
-            
+
                 contextMenuCard = { instanceId, fromZone: parentZoneName };
-            
+                const cardData = cardDataMap.get(instanceId);
+
+                if (!cardData) return; // Exit if we can't find card data
+
                 let menuHTML = '';
-                
+
+                // Universal "Counters" Menu for all battlefield cards/tokens
                 if (parentZoneName === 'battlefield') {
-                    const cardData = gameState.players[myPlayerId]?.battlefield.find(c => c.instanceId === instanceId);
-                    if (cardData && cardData.isToken) {
-                        menuHTML = `<div><button class="context-menu-button text-white" data-action="delete-token">Delete Token</button></div>`;
-                    } else if (cardData) {
-                        if (cardData.counters && Object.keys(cardData.counters).length > 0) {
-                            Object.entries(cardData.counters).forEach(([name, count]) => {
-                                const decodedName = decodeFirebaseKey(name);
-                                menuHTML += `
-                                    <div class="context-menu-item">
-                                        <span class="mr-2 truncate">${decodedName} (${count})</span>
-                                        <div class="flex items-center gap-2">
-                                            <button data-action="change-counter" data-name="${name}" data-amount="-1" class="flex items-center justify-center bg-gray-600 w-6 h-6 rounded-full">-</button>
-                                            <button data-action="change-counter" data-name="${name}" data-amount="1" class="flex items-center justify-center bg-gray-600 w-6 h-6 rounded-full">+</button>
-                                        </div>
-                                    </div>`;
-                            });
-                        } else {
-                            menuHTML += `<div class="p-2 text-sm text-gray-400 text-center">No counters</div>`;
-                        }
-                        menuHTML += `<div class="context-menu-divider"></div>
-                                     <div class="p-1">
-                                         <input type="text" id="new-counter-name" placeholder="New counter..." class="context-menu-input mb-2">
-                                         <button data-action="add-counter" class="w-full bg-indigo-600 text-white text-sm py-1 rounded">Add</button>
-                                     </div>`;
-                    }
-                } else {
-                    menuHTML += '<div>';
-                    const targetZones = ['Hand', 'Battlefield', 'Graveyard', 'Exile', 'Commander', 'Library (Top)', 'Library (Bottom)'];
-                    targetZones.forEach(zone => {
-                        const zoneId = zone.toLowerCase().replace(' (top)','-top').replace(' (bottom)','-bottom');
-                        menuHTML += `<button class="context-menu-button text-white" data-action="move-to" data-zone="${zoneId}">${zone}</button>`;
-                    });
-                    menuHTML += '</div>';
+                    menuHTML += `
+                        <div>
+                            <button class="context-menu-button" data-action="submenu" data-submenu="counters-menu">Counters</button>
+                            <div id="counters-menu" class="context-submenu hidden">
+                                ${(cardData.counters && Object.keys(cardData.counters).length > 0)
+                                    ? Object.entries(cardData.counters).map(([name, count]) => `
+                                        <div class="context-menu-item">
+                                            <span class="mr-2 truncate">${decodeFirebaseKey(name)} (${count})</span>
+                                            <div class="flex items-center gap-2">
+                                                <button data-action="change-counter" data-name="${name}" data-amount="-1" class="flex items-center justify-center bg-gray-600 w-6 h-6 rounded-full">-</button>
+                                                <button data-action="change-counter" data-name="${name}" data-amount="1" class="flex items-center justify-center bg-gray-600 w-6 h-6 rounded-full">+</button>
+                                            </div>
+                                        </div>`).join('')
+                                    : '<div class="p-2 text-sm text-gray-400 text-center">No counters</div>'
+                                }
+                                <div class="context-menu-divider"></div>
+                                <div class="p-1">
+                                    <input type="text" id="new-counter-name" placeholder="New counter..." class="context-menu-input mb-2">
+                                    <button data-action="add-counter" class="w-full bg-indigo-600 text-white text-sm py-1 rounded">Add</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="context-menu-divider"></div>
+                    `;
                 }
-                
+
+                // "Move Card" Menu for non-tokens
+                if (!cardData.isToken) {
+                    menuHTML += `
+                        <div>
+                            <button class="context-menu-button" data-action="submenu" data-submenu="move-menu">Move Card</button>
+                            <div id="move-menu" class="context-submenu hidden">
+                                ${['Hand', 'Battlefield', 'Graveyard', 'Exile', 'Commander', 'Library (Top)', 'Library (Bottom)'].map(zone => {
+                                    const zoneId = zone.toLowerCase().replace(' (top)','-top').replace(' (bottom)','-bottom');
+                                    return `<button class="context-menu-button text-white" data-action="move-to" data-zone="${zoneId}">${zone}</button>`;
+                                }).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // "Delete Token" option, only for tokens
+                if (cardData.isToken) {
+                    menuHTML += `<div><button class="context-menu-button text-white" data-action="delete-token">Delete Token</button></div>`;
+                }
+
                 contextMenu.innerHTML = menuHTML;
                 contextMenu.classList.remove('hidden');
-
+                // ... positioning logic remains the same ...
                 const menuHeight = contextMenu.offsetHeight;
                 const menuWidth = contextMenu.offsetWidth;
                 let top = event.clientY;
                 let left = event.clientX;
 
-                if (top + menuHeight > window.innerHeight) {
+                // NEW LOGIC: If the click is in the bottom half of the screen, open the menu upwards.
+                if (event.clientY > window.innerHeight / 2) {
                     top = event.clientY - menuHeight;
                 }
+
+                // Keep the logic to prevent going off the right edge.
                 if (left + menuWidth > window.innerWidth) {
                     left = event.clientX - menuWidth;
+                }
+
+                // Keep the logic to prevent going off the top edge.
+                if (top < 0) {
+                    top = 5; // Small buffer from the top edge
                 }
 
                 contextMenu.style.left = `${left}px`;
@@ -1003,10 +1032,29 @@
             }
 
             function handleContextMenuClick(event) {
-                 const button = event.target.closest('button[data-action]');
+                const button = event.target.closest('button[data-action]');
                 if (!button) return;
 
                 const action = button.dataset.action;
+
+                // FIX: Handle submenu toggling
+                if (action === 'submenu') {
+                    const submenuId = button.dataset.submenu;
+                    const submenu = document.getElementById(submenuId);
+                    if (submenu) {
+                        submenu.classList.toggle('hidden');
+
+                        // FIX: After opening a submenu, check if the whole menu is now off-screen
+                        const menuRect = contextMenu.getBoundingClientRect();
+                        if (menuRect.bottom > window.innerHeight) {
+                            // If it is, move it up by the amount it's overflowing
+                            const overflow = menuRect.bottom - window.innerHeight;
+                            const newTop = contextMenu.offsetTop - overflow - 10; // 10px buffer
+                            contextMenu.style.top = `${newTop}px`;
+                        }
+                    }
+                    return; // Stop further execution
+                }
 
                 if (action === 'change-counter') {
                     const name = button.dataset.name;
@@ -1031,7 +1079,12 @@
                 } else if (action === 'surveil') {
                     handleSurveil();
                 }
-                hideContextMenu();
+                
+                // Don't hide the main menu if a counter button was clicked,
+                // as the counter submenu should stay open.
+                if (action !== 'change-counter' && action !== 'add-counter') {
+                    hideContextMenu();
+                }
             }
 
             function changeCounter(encodedCounterName, amount) {
