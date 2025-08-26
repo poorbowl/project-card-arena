@@ -1099,7 +1099,13 @@
                     cardEl.removeEventListener('mouseleave', handleCardMouseOut);
                     cardEl.removeEventListener('mousemove', handleCardMouseMove);
 
-                    if (cardEl.closest(`#player-area-${myPlayerId}, #main-player-hand-area, #zone-viewer-modal, #library-search-modal`)) {
+                    // Determine if the card is in a context where the current player has control
+                    const inMyPlayerArea = cardEl.closest(`#player-area-${myPlayerId}, #main-player-hand-area`);
+                    const inMyModal = cardEl.closest('#zone-viewer-modal') && zoneViewerContent.dataset.ownerId === myPlayerId;
+                    const inMyLibrarySearch = cardEl.closest('#library-search-modal');
+
+                    if (inMyPlayerArea || inMyModal || inMyLibrarySearch) {
+                        // These listeners are for actions the player can take on their own cards
                         cardEl.addEventListener('click', handleCardClick);
                         cardEl.addEventListener('contextmenu', showContextMenu);
                         cardEl.addEventListener('touchstart', handleTouchStart);
@@ -1275,6 +1281,8 @@
                 zoneViewerTitle.textContent = `${ownerName} ${zoneName.charAt(0).toUpperCase() + zoneName.slice(1)}`;
                 zoneViewerContent.innerHTML = '';
                 zoneViewerContent.dataset.zoneName = zoneName;
+                zoneViewerContent.dataset.ownerId = playerId;
+
                 
                 if (cards.length === 0) {
                     zoneViewerContent.innerHTML = '<p class="text-gray-500">This zone is empty.</p>';
