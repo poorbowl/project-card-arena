@@ -362,8 +362,12 @@
 <body data-chat-state="closed" class="text-white">
 
     <header class="flex-shrink-0 bg-gray-800 p-2 flex justify-between items-center shadow-md">
-        <div class="text-xs">Game ID: <span id="gameIdDisplay" class="font-mono bg-gray-700 px-2 py-1 rounded"></span></div>
-        <button id="leaveGameBtn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded-lg text-xs">Leave Game</button>
+         <div class="text-xs">Game ID: <span id="gameIdDisplay" class="font-mono bg-gray-700 px-2 py-1 rounded"></span></div>
+
+        <div class="flex items-center gap-4">
+            <button id="changeBackgroundBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1 px-3 rounded-lg text-xs">Change Background</button>
+            <button id="leaveGameBtn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded-lg text-xs">Leave Game</button>
+        </div>
     </header>
 
     <main class="main-grid flex-grow p-2">
@@ -485,6 +489,8 @@
             <input type="text" id="chat-input" placeholder="Type a message..." class="w-full p-2 text-white bg-gray-700 rounded-md border border-gray-600 focus:outline-none focus:ring-1 focus:ring-indigo-500">
         </div>
     </div>
+
+    <input type="file" id="background-uploader" class="hidden" accept="image/*">
 
 
     <script>
@@ -1750,6 +1756,44 @@
             }
 
             async function initializeGame() {
+                const changeBackgroundBtn = document.getElementById('changeBackgroundBtn');
+                const backgroundUploader = document.getElementById('background-uploader');
+
+                // Function to apply a background image
+                const applyBackground = (imageUrl) => {
+                    document.body.style.backgroundImage = `url(${imageUrl})`;
+                    document.body.style.backgroundSize = 'cover';
+                    document.body.style.backgroundPosition = 'center';
+                    document.body.style.backgroundRepeat = 'no-repeat';
+                };
+
+                // On load, check for a saved background
+                const savedBackground = localStorage.getItem('customGameBoardBackground');
+                if (savedBackground) {
+                    applyBackground(savedBackground);
+                }
+
+                // Listener for the new button
+                changeBackgroundBtn.addEventListener('click', () => {
+                    backgroundUploader.click();
+                });
+
+                // Listener for when a file is selected
+                backgroundUploader.addEventListener('change', (event) => {
+                    const file = event.target.files[0];
+                    if (!file || !file.type.startsWith('image/')) {
+                        return; // Ensure it's an image file
+                    }
+
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const imageUrl = e.target.result;
+                        applyBackground(imageUrl);
+                        // Save the image to local storage for persistence
+                        localStorage.setItem('customGameBoardBackground', imageUrl);
+                    };
+                    reader.readAsDataURL(file);
+                });
             // --- EVENT LISTENERS ---
             contextMenu.addEventListener('click', handleContextMenuClick);
             window.addEventListener('click', (e) => {
