@@ -321,7 +321,10 @@
         </div>
         <div>
             <div class="bg-gray-900 p-4 rounded-lg mb-8">
-                <h2 class="text-2xl font-semibold mb-4">Assemble Deck</h2>
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-semibold">Assemble Deck</h2>
+                    <button id="clearDeckBtn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded-lg text-sm">Clear</button>
+                </div>
                 <div class="flex items-center mb-4">
                     <input type="text" id="deckName" placeholder="Deck Name" class="block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
                     <button id="saveDeck" class="ml-2 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">Save</button>
@@ -457,7 +460,7 @@
 </div>
     <script>
     // --- DOM Elements (Declared Globally) ---
-    let cardCollectionEl, deckListEl, commanderListEl, deckCountEl, deckNameEl, saveDeckBtn, savedDecksEl,
+    let cardCollectionEl, deckListEl, commanderListEl, deckCountEl, deckNameEl, saveDeckBtn, clearDeckBtn, savedDecksEl,
         saveCardBtn, cancelEditBtn, formTitleEl, cardTypeSelect, creatureFields, planeswalkerFields,
         createGameBtn, joinGameBtn, joinGameIdInput, messageAreaEl, importCsvBtn, imageUploadProgressEl,
         lobbySectionEl, lobbyControlsEl, gameCreatedSectionEl, inviteLinkInputEl, copyLinkBtn, enterGameBtn,
@@ -1306,6 +1309,15 @@
             renderDeckList();
         };
 
+        const handleClearDeck = () => {
+            if (confirm("Are you sure you want to clear the current deck?")) {
+                currentDeck = [];
+                commanders = [];
+                deckNameEl.value = ''; // Also clear the deck name input
+                renderDeckList();
+            }
+        };
+
         const handleSaveDeck = async () => {
             hideMessage();
             const name = deckNameEl.value.trim();
@@ -1944,6 +1956,7 @@
                         deckCountEl = document.getElementById('deckCount');
                         deckNameEl = document.getElementById('deckName');
                         saveDeckBtn = document.getElementById('saveDeck');
+                        clearDeckBtn = document.getElementById('clearDeckBtn');
                         savedDecksEl = document.getElementById('savedDecks');
                         saveCardBtn = document.getElementById('saveCardBtn');
                         cancelEditBtn = document.getElementById('cancelEditBtn');
@@ -2059,6 +2072,7 @@
                         saveCardBtn.addEventListener('click', handleSaveCard);
                         cancelEditBtn.addEventListener('click', resetForm);
                         saveDeckBtn.addEventListener('click', handleSaveDeck);
+                        clearDeckBtn.addEventListener('click', handleClearDeck);
                         createGameBtn.addEventListener('click', handleCreateGame);
                         joinGameBtn.addEventListener('click', handleJoinGame);
                         copyLinkBtn.addEventListener('click', handleCopyLink);
