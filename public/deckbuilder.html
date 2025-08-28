@@ -291,6 +291,12 @@
                     <option value="custom">User-Created</option>
                     <option value="scryfall">Scryfall</option>
                 </select>
+
+                <select id="filterDeck" class="bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    <option value="">Filter by Deck</option>
+                    <!-- Deck names will be added here by JavaScript -->
+                </select>
+
                 <select id="filterSort" class="bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
                     <option value="name_asc">Sort: Name (A-Z)</option>
                     <option value="name_desc">Sort: Name (Z-A)</option>
@@ -511,7 +517,7 @@
         notFoundCount, downloadCsvBtn, addDirectlyBtn, importReviewModal, importReviewClose,
         importSelectAllBtn, importDeselectAllBtn, importSelectionCountEl, importReviewContent,
         importReviewCancel, importReviewConfirm, filterNameInput, filterTypeSelect, filterSortSelect,
-        filterColorSelect, filterSourceSelect, prevPageBtn, nextPageBtn, pageInfoEl, toggleSelectModeBtn,
+        filterColorSelect, filterSourceSelect, filterDeckSelect, prevPageBtn, nextPageBtn, pageInfoEl, toggleSelectModeBtn,
         selectionActionBar, selectionCountEl, deleteSelectedBtn, addSelectedToDeckBtn, selectAllBtn, deselectAllBtn, cardPopoutEl,
         popoutNameEl, popoutCostEl, popoutImgEl, popoutTypeEl, popoutPtEl, popoutTextEl, popoutFlavourEl, 
         importReviewAddToDeckBtn, addToDeckModal, addToDeckCloseBtn, deckChoiceList, addToDeckConfirmBtn,
@@ -535,6 +541,7 @@
         let cardsPerPage = 20; // You can change this number to show more or fewer cards (potentially - this note was originally written when this was a const)
         let currentView = 'grid'; // Can be 'grid' or 'list'
         let currentlyVisibleCards = [];
+        let savedDecksData = new Map();
         let jumpToPageInput, cardsPerPageSelect;
 
         // --- MESSAGE FUNCTIONS ---
@@ -891,6 +898,15 @@
             const sourceQuery = filterSourceSelect.value;
             if (sourceQuery) filteredCards = filteredCards.filter(card => card.source === sourceQuery);
 
+            const deckQuery = filterDeckSelect.value;
+            if (deckQuery) {
+                const deckData = savedDecksData.get(deckQuery);
+                if (deckData && deckData.cardIds) {
+                    const cardIdsInDeck = new Set(deckData.cardIds);
+                    filteredCards = filteredCards.filter(card => cardIdsInDeck.has(card.id));
+                }
+            }
+
             // --- NEW Mana Value Filter Logic ---
             const mvValue = parseInt(manaValueFilter.value, 10);
             if (!isNaN(mvValue)) {
@@ -1025,6 +1041,7 @@
 
                 snapshot.forEach(doc => {
                     const deckName = doc.id; // In our new structure, the document ID is the deck name
+                    savedDecksData.set(deckName, doc.data());
                     const deckContainer = document.createElement('div');
                     deckContainer.className = 'flex justify-between items-center bg-gray-800 p-2 rounded';
 
@@ -1045,6 +1062,26 @@
             } catch (error) {
                 console.error("Error loading saved decks:", error);
                 showMessage("Could not load saved decks from the cloud.", true);
+            }
+        };
+
+        const populateDeckFilter = async () => {
+            if (!myUserId || !filterDeckSelect) return;
+
+            // Keep the default option
+            filterDeckSelect.innerHTML = '<option value="">Filter by Deck</option>';
+
+            try {
+                const snapshot = await db.collection('users').doc(myUserId).collection('decks').get();
+                snapshot.forEach(doc => {
+                    const deckName = doc.id;
+                    const option = document.createElement('option');
+                    option.value = deckName;
+                    option.textContent = deckName;
+                    filterDeckSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error("Error populating deck filter:", error);
             }
         };
 
@@ -1451,8 +1488,8 @@
                 await deckRef.set(deckData);
 
                 showMessage(`Success: Deck "${name}" has been saved!`, false);
-                // We will update renderSavedDecks in the next step.
                 await renderSavedDecks(); 
+                await populateDeckFilter();
             } catch (error) {
                 console.error("Error saving deck to Firestore:", error);
                 showMessage("Failed to save deck. Please check the console.", true);
@@ -1483,6 +1520,7 @@
                 await db.collection('users').doc(myUserId).collection('decks').doc(name).delete();
                 showMessage(`Successfully deleted deck "${name}".`, false);
                 await renderSavedDecks(); // Re-render the list after deleting
+                await populateDeckFilter();
             } catch (error) {
                 console.error("Error deleting deck:", error);
                 showMessage("Failed to delete deck. Please check the console.", true);
@@ -2192,6 +2230,7 @@
                         filterSortSelect = document.getElementById('filterSort');
                         filterColorSelect = document.getElementById('filterColor');
                         filterSourceSelect = document.getElementById('filterSource');
+                        filterDeckSelect = document.getElementById('filterDeck');
                         prevPageBtn = document.getElementById('prev-page-btn');
                         nextPageBtn = document.getElementById('next-page-btn');
                         pageInfoEl = document.getElementById('page-info');
@@ -2292,6 +2331,7 @@
                         filterSortSelect.addEventListener('change', renderFilteredCollection);
                         filterColorSelect.addEventListener('change', renderFilteredCollection);
                         filterSourceSelect.addEventListener('change', renderFilteredCollection);
+                        filterDeckSelect.addEventListener('change', renderFilteredCollection);
                         manaValueOperator.addEventListener('change', renderFilteredCollection);
                         manaValueFilter.addEventListener('input', renderFilteredCollection);
                         prevPageBtn.addEventListener('click', () => {
@@ -2341,6 +2381,7 @@
                         // --- INITIAL LOAD ---
                         await loadAllCardsFromFirebase();
                         await renderSavedDecks();
+                        await populateDeckFilter();
                         cardTypeSelect.dispatchEvent(new Event('change'));
 
                     } catch (error) {
