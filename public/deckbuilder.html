@@ -1723,6 +1723,8 @@
                                 });
                                 await batch.commit();
                                 await loadAllCardsFromFirebase();
+                                renderFilteredCollection(); 
+                                closeImportReviewModal(); 
                             } catch (error) {
                                 console.error("Error saving cards to Firestore:", error);
                                 showMessage("An error occurred while saving new cards.", true, 'import');
@@ -1860,21 +1862,22 @@
         const handleConfirmImport = async () => {
             if (importSelectedCards.size === 0) {
                 showMessage("No cards selected.", true, 'scryfall');
-                return;
+                return { imported: [], skipped: [] }; // Return empty arrays
             }
 
             const selectedData = fetchedCardsData.filter(card => importSelectedCards.has(card.name));
-
             const cardsToCreate = [];
-            let skippedCount = 0;
+            const skippedCardNames = [];
+            const importedCardNames = [];
             const existingCardNames = new Set(allCards.map(c => c.name.toLowerCase()));
 
             for (const cardData of selectedData) {
                 if (!isBasicLand(cardData.name, cardData.type) && existingCardNames.has(cardData.name.toLowerCase())) {
-                    skippedCount++;
+                    skippedCardNames.push(cardData.name);
                     continue;
                 }
                 cardsToCreate.push(cardData);
+                importedCardNames.push(cardData.name);
                 existingCardNames.add(cardData.name.toLowerCase());
             }
 
@@ -1886,20 +1889,31 @@
                         batch.set(docRef, cardData);
                     });
                     await batch.commit();
-                    await loadAllCardsFromFirebase(); // Refresh the main collection
+                    await loadAllCardsFromFirebase();
                 } catch (error) {
                     console.error("Error saving imported cards:", error);
                     showMessage("An error occurred while saving new cards.", true, 'scryfall');
-                    closeImportReviewModal();
-                    return;
+                    return { imported: [], skipped: [] }; // Return empty arrays on error
                 }
             }
 
-            let successMessage = `Successfully added ${cardsToCreate.length} new cards to your collection!`;
-            if (skippedCount > 0) {
-                successMessage += ` Skipped ${skippedCount} cards you already own.`;
+            // Return the results instead of showing a message or closing the modal
+            return { imported: importedCardNames, skipped: skippedCardNames };
+        };
+
+        const handleAddToCollection = async () => {
+            const { imported, skipped } = await handleConfirmImport();
+
+            if (imported.length === 0 && skipped.length === 0) return; // Do nothing if no cards were processed
+
+            let successMessage = `Successfully added ${imported.length} new cards to your collection!`;
+            if (skipped.length > 0) {
+                successMessage += ` Skipped ${skipped.length} cards you already own.`;
             }
             showMessage(successMessage, false, 'scryfall');
+
+            renderFilteredCollection();
+            closeImportReviewModal();
         };
 
         const handleScryfallImportAndAddToDeck = async () => {
@@ -1907,10 +1921,21 @@
                 showMessage("No cards selected.", true, 'scryfall');
                 return;
             }
-            // First, save the cards to the collection. This will also close the review modal.
-            await handleConfirmImport(); 
-            // Then, after they are saved, open the modal to choose a deck.
-            openAddToDeckModal('import');
+
+            // Save the cards and get the names of the ones that were actually imported
+            const { imported } = await handleConfirmImport();
+
+            if (imported.length > 0) {
+                // Re-select only the cards that were successfully added to the collection
+                importSelectedCards.clear();
+                imported.forEach(name => importSelectedCards.add(name));
+
+                // Now, open the modal to choose a deck
+                openAddToDeckModal('import');
+            } else {
+                // If no new cards were added, just close the review modal
+                closeImportReviewModal();
+            }
         };
 
         async function fetchCardsFromScryfall(names) {
@@ -2294,7 +2319,7 @@
                         });
                         importReviewClose.addEventListener('click', closeImportReviewModal);
                         importReviewCancel.addEventListener('click', closeImportReviewModal);
-                        importReviewConfirm.addEventListener('click', handleConfirmImport);
+                        importReviewConfirm.addEventListener('click', handleAddToCollection); // Use the new handler
                         importReviewAddToDeckBtn.addEventListener('click', handleScryfallImportAndAddToDeck);
                         importSelectAllBtn.addEventListener('click', () => {
                             importReviewContent.querySelectorAll('.card-wrapper').forEach(wrapper => {
