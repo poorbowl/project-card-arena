@@ -306,6 +306,8 @@
             <div id="selection-action-bar" class="hidden bg-gray-900 p-3 rounded-lg mb-4 flex justify-between items-center">
                 <span id="selection-count" class="text-gray-400">0 cards selected</span>
                 <div class="flex gap-4">
+                    <button id="select-all-btn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Select All on Page</button>
+                    <button id="deselect-all-btn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Deselect All</button>
                     <button id="add-selected-to-deck-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">Add to Deck</button>
                     <button id="delete-selected-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Delete Selected</button>
                 </div>
@@ -493,7 +495,7 @@
         importSelectAllBtn, importDeselectAllBtn, importSelectionCountEl, importReviewContent,
         importReviewCancel, importReviewConfirm, filterNameInput, filterTypeSelect, filterSortSelect,
         filterColorSelect, filterSourceSelect, prevPageBtn, nextPageBtn, pageInfoEl, toggleSelectModeBtn,
-        selectionActionBar, selectionCountEl, deleteSelectedBtn, addSelectedToDeckBtn, cardPopoutEl,
+        selectionActionBar, selectionCountEl, deleteSelectedBtn, addSelectedToDeckBtn, selectAllBtn, deselectAllBtn, cardPopoutEl,
         popoutNameEl, popoutCostEl, popoutImgEl, popoutTypeEl, popoutPtEl, popoutTextEl, popoutFlavourEl, 
         importReviewAddToDeckBtn, addToDeckModal, addToDeckCloseBtn, deckChoiceList, addToDeckConfirmBtn,
         gridViewBtn, listViewBtn, manaValueOperator, manaValueFilter;
@@ -515,6 +517,7 @@
         let currentPage = 1;
         const cardsPerPage = 20; // You can change this number to show more or fewer cards
         let currentView = 'grid'; // Can be 'grid' or 'list'
+        let currentlyVisibleCards = [];
 
         // --- MESSAGE FUNCTIONS ---
         const showMessage = (message, isError = true, area = 'create') => {
@@ -561,6 +564,21 @@
                 selectionActionBar.classList.add('hidden');
             }
             renderFilteredCollection(); // Re-render the collection to update card styles
+        };
+
+        const handleSelectAllOnPage = () => {
+            // Use the data array directly instead of querying the DOM
+            currentlyVisibleCards.forEach(card => {
+                selectedCards.add(card.id);
+            });
+            selectionCountEl.textContent = `${selectedCards.size} cards selected`;
+            renderFilteredCollection(); // Re-render to show the new selections
+        };
+
+        const handleDeselectAll = () => {
+            selectedCards.clear();
+            selectionCountEl.textContent = `0 cards selected`;
+            renderFilteredCollection(); // Re-render to remove all selection highlights
         };
 
         // --- RENDER FUNCTIONS ---
@@ -721,6 +739,7 @@
 
         const renderCardAsListItem = (card, container) => {
             const listItem = document.createElement('div');
+            listItem.dataset.cardId = card.id;
             listItem.className = 'p-2 bg-gray-700 rounded-lg flex items-center gap-4 transition-all border-2 border-transparent';
 
             // --- Add a highlight if the card is selected ---
@@ -869,6 +888,7 @@
             const startIndex = (currentPage - 1) * cardsPerPage;
             const endIndex = startIndex + cardsPerPage;
             const paginatedCards = filteredCards.slice(startIndex, endIndex);
+            currentlyVisibleCards = paginatedCards;
             cardCollectionEl.innerHTML = '';
             if (currentView === 'grid') {
                 cardCollectionEl.className = 'bg-gray-900 p-4 rounded-lg min-h-[300px] grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4';
@@ -1726,6 +1746,7 @@
 
             cards.forEach(cardData => {
                 const cardWrapper = document.createElement('div');
+                cardWrapper.dataset.cardId = card.id;
                 cardWrapper.className = 'card-wrapper p-2 bg-gray-700 rounded-lg flex flex-col items-center justify-between cursor-pointer transition-all border-2 border-transparent relative'; // Added relative positioning
                 cardWrapper.dataset.cardId = cardData.name;
 
@@ -2119,6 +2140,8 @@
                         selectionCountEl = document.getElementById('selection-count');
                         deleteSelectedBtn = document.getElementById('delete-selected-btn');
                         addSelectedToDeckBtn = document.getElementById('add-selected-to-deck-btn');
+                        selectAllBtn = document.getElementById('select-all-btn');
+                        deselectAllBtn = document.getElementById('deselect-all-btn');
                         cardPopoutEl = document.getElementById('card-popout');
                         popoutNameEl = document.getElementById('popout-name');
                         popoutCostEl = document.getElementById('popout-cost');
@@ -2222,6 +2245,8 @@
                         toggleSelectModeBtn.addEventListener('click', toggleSelectMode);
                         deleteSelectedBtn.addEventListener('click', handleDeleteSelected);
                         addSelectedToDeckBtn.addEventListener('click', () => openAddToDeckModal('collection'));
+                        selectAllBtn.addEventListener('click', handleSelectAllOnPage);
+                        deselectAllBtn.addEventListener('click', handleDeselectAll);
                         addToDeckCloseBtn.addEventListener('click', () => {
                             addToDeckModal.classList.add('hidden');
                             if (addToDeckModal.dataset.source === 'import') {
