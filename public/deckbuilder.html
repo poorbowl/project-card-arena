@@ -1682,6 +1682,10 @@
                     importSelectionCountEl.textContent = `${importSelectedCards.size} cards selected`;
                 });
 
+                cardWrapper.addEventListener('mouseenter', (e) => showCardPopout(e, cardData));
+                cardWrapper.addEventListener('mouseleave', hideCardPopout);
+                cardWrapper.addEventListener('mousemove', moveCardPopout);
+
                 importReviewContent.appendChild(cardWrapper);
             });
 
