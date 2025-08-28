@@ -1780,16 +1780,14 @@
             importSelectedCards.clear();
             const existingCardNames = new Set(allCards.map(c => c.name.toLowerCase()));
 
-            cards.forEach(cardData => {
+            cards.forEach(cardData => { // The parameter here is 'cardData'
                 const cardWrapper = document.createElement('div');
-                cardWrapper.dataset.cardId = card.id;
-                cardWrapper.className = 'card-wrapper p-2 bg-gray-700 rounded-lg flex flex-col items-center justify-between cursor-pointer transition-all border-2 border-transparent relative'; // Added relative positioning
+                cardWrapper.className = 'card-wrapper p-2 bg-gray-700 rounded-lg flex flex-col items-center justify-between cursor-pointer transition-all border-2 border-transparent relative';
                 cardWrapper.dataset.cardId = cardData.name;
 
-                // --- NEW: Check if card is already in collection ---
                 const alreadyOwned = existingCardNames.has(cardData.name.toLowerCase());
                 if (alreadyOwned) {
-                    cardWrapper.classList.add('opacity-60'); // Fade the card slightly
+                    cardWrapper.classList.add('opacity-60');
                     const badge = document.createElement('span');
                     badge.className = 'absolute top-1 right-1 bg-indigo-500 text-white text-xs font-bold px-2 py-1 rounded-full';
                     badge.textContent = 'In Collection';
@@ -1821,6 +1819,7 @@
                     importSelectionCountEl.textContent = `${importSelectedCards.size} cards selected`;
                 });
 
+                // Add the pop-out listeners that were missing
                 cardWrapper.addEventListener('mouseenter', (e) => showCardPopout(e, cardData));
                 cardWrapper.addEventListener('mouseleave', hideCardPopout);
                 cardWrapper.addEventListener('mousemove', moveCardPopout);
