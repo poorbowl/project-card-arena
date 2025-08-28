@@ -1483,6 +1483,7 @@
                         });
                     });
                     await batch.commit();
+                    await renderSavedDecks();
                 } catch (error) {
                     console.error(`Error adding cards to saved decks:`, error);
                 }
@@ -1681,7 +1682,7 @@
             importSelectedCards.clear();
         }
 
-        const handleConfirmImport = async (addToDeck = false) => {
+        const handleConfirmImport = async () => {
             if (importSelectedCards.size === 0) {
                 showMessage("No cards selected.", true, 'scryfall');
                 return;
@@ -1710,7 +1711,7 @@
                         batch.set(docRef, cardData);
                     });
                     await batch.commit();
-                    await loadAllCardsFromFirebase();
+                    await loadAllCardsFromFirebase(); // Refresh the main collection
                 } catch (error) {
                     console.error("Error saving imported cards:", error);
                     showMessage("An error occurred while saving new cards.", true, 'scryfall');
@@ -1719,26 +1720,22 @@
                 }
             }
 
-            // --- NEW LOGIC TO ADD TO DECK ---
-            if (addToDeck) {
-                selectedData.forEach(cardData => {
-                    // Find the full card object from our now-updated collection
-                    const cardToAdd = allCards.find(c => c.name === cardData.name);
-                    if (cardToAdd) {
-                        currentDeck.push(cardToAdd);
-                    }
-                });
-                renderDeckList();
-                let successMessage = `Added ${cardsToCreate.length} new cards to collection and ${selectedData.length} cards to deck.`;
-                if (skippedCount > 0) successMessage += ` Skipped ${skippedCount} duplicates.`;
-                showMessage(successMessage, false, 'scryfall');
-            } else {
-                let successMessage = `Successfully added ${cardsToCreate.length} new cards to your collection!`;
-                if (skippedCount > 0) successMessage += ` Skipped ${skippedCount} cards you already own.`;
-                showMessage(successMessage, false, 'scryfall');
+            let successMessage = `Successfully added ${cardsToCreate.length} new cards to your collection!`;
+            if (skippedCount > 0) {
+                successMessage += ` Skipped ${skippedCount} cards you already own.`;
             }
+            showMessage(successMessage, false, 'scryfall');
+        };
 
-            closeImportReviewModal();
+        const handleScryfallImportAndAddToDeck = async () => {
+            if (importSelectedCards.size === 0) {
+                showMessage("No cards selected.", true, 'scryfall');
+                return;
+            }
+            // First, save the cards to the collection. This will also close the review modal.
+            await handleConfirmImport(); 
+            // Then, after they are saved, open the modal to choose a deck.
+            openAddToDeckModal('import');
         };
 
         async function fetchCardsFromScryfall(names) {
@@ -2105,8 +2102,8 @@
                         });
                         importReviewClose.addEventListener('click', closeImportReviewModal);
                         importReviewCancel.addEventListener('click', closeImportReviewModal);
-                        importReviewConfirm.addEventListener('click', () => handleConfirmImport(false));
-                        importReviewAddToDeckBtn.addEventListener('click', () => openAddToDeckModal('import'));
+                        importReviewConfirm.addEventListener('click', handleConfirmImport);
+                        importReviewAddToDeckBtn.addEventListener('click', handleScryfallImportAndAddToDeck);
                         importSelectAllBtn.addEventListener('click', () => {
                             importReviewContent.querySelectorAll('.card-wrapper').forEach(wrapper => {
                                 if (!importSelectedCards.has(wrapper.dataset.cardId)) {
