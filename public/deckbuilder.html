@@ -314,11 +314,28 @@
             </div>
 
             <div id="cardCollection" class="bg-gray-900 p-4 rounded-lg min-h-[300px] grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"></div>
-            <div id="pagination-controls" class="flex justify-between items-center mt-4">
+            <div id="pagination-controls" class="flex justify-between items-center mt-4 flex-wrap gap-4">
                 <button id="prev-page-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-600 disabled:cursor-not-allowed">
-                     &larr; Previous
+                    &larr; Previous
                 </button>
-                <span id="page-info" class="text-gray-400 text-sm">Page 1</span>
+
+                <div class="flex items-center gap-4">
+                    <span id="page-info" class="text-gray-400 text-sm">Page 1 of 1</span>
+                    <div class="flex items-center gap-2">
+                        <label for="jump-to-page-input" class="text-sm text-gray-400">Jump to:</label>
+                        <input type="number" id="jump-to-page-input" class="w-16 bg-gray-700 border border-gray-600 rounded-md py-1 px-2 text-white">
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <label for="cards-per-page-select" class="text-sm text-gray-400">Show:</label>
+                    <select id="cards-per-page-select" class="bg-gray-700 border border-gray-600 rounded-md py-1 px-2 text-white">
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                </div>
+
                 <button id="next-page-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-600 disabled:cursor-not-allowed">
                     Next &rarr;
                 </button>
@@ -515,9 +532,10 @@
         let importSelectedCards = new Set();
         let deckSortOrder = 'name'; 
         let currentPage = 1;
-        const cardsPerPage = 20; // You can change this number to show more or fewer cards
+        let cardsPerPage = 20; // You can change this number to show more or fewer cards (potentially - this note was originally written when this was a const)
         let currentView = 'grid'; // Can be 'grid' or 'list'
         let currentlyVisibleCards = [];
+        let jumpToPageInput, cardsPerPageSelect;
 
         // --- MESSAGE FUNCTIONS ---
         const showMessage = (message, isError = true, area = 'create') => {
@@ -573,6 +591,23 @@
             });
             selectionCountEl.textContent = `${selectedCards.size} cards selected`;
             renderFilteredCollection(); // Re-render to show the new selections
+        };
+
+        // Flexibility with cards per page and jumping to specific pages with cards
+        const handleJumpToPage = (event) => {
+            const page = parseInt(event.target.value, 10);
+            const totalPages = Math.ceil(allCards.length / cardsPerPage);
+            if (page >= 1 && page <= totalPages) {
+                currentPage = page;
+                renderFilteredCollection();
+            }
+            event.target.value = ''; // Clear the input after jumping
+        };
+
+        const handlePerPageChange = (event) => {
+            cardsPerPage = parseInt(event.target.value, 10);
+            currentPage = 1; // Reset to the first page
+            renderFilteredCollection();
         };
 
         const handleDeselectAll = () => {
@@ -883,6 +918,7 @@
             }
 
             // --- Pagination and Rendering ---
+            cardsPerPage = parseInt(cardsPerPageSelect.value, 10);
             const totalPages = Math.ceil(filteredCards.length / cardsPerPage);
             if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
             const startIndex = (currentPage - 1) * cardsPerPage;
@@ -2158,6 +2194,8 @@
                         listViewBtn = document.getElementById('list-view-btn');
                         manaValueOperator = document.getElementById('manaValueOperator');
                         manaValueFilter = document.getElementById('manaValueFilter');
+                        jumpToPageInput = document.getElementById('jump-to-page-input');
+                        cardsPerPageSelect = document.getElementById('cards-per-page-select');
 
                         // --- ATTACH ALL EVENT LISTENERS ---
                         const tabBtns = document.querySelectorAll('.tab-button');
@@ -2242,6 +2280,8 @@
                             currentPage++;
                             renderFilteredCollection();
                         });
+                        jumpToPageInput.addEventListener('change', handleJumpToPage);
+                        cardsPerPageSelect.addEventListener('change', handlePerPageChange);
                         toggleSelectModeBtn.addEventListener('click', toggleSelectMode);
                         deleteSelectedBtn.addEventListener('click', handleDeleteSelected);
                         addSelectedToDeckBtn.addEventListener('click', () => openAddToDeckModal('collection'));
