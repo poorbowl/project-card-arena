@@ -180,8 +180,11 @@
                         <input type="file" id="csvFile" accept=".csv" class="mt-2 block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700">
                     </div>
                     <div id="import-message-area" class="hidden my-4 p-3 rounded-lg"></div>
-                    <button id="importCsvBtn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">Import Cards from CSV</button>
-                </div>
+                    <div class="flex flex-col sm:flex-row gap-4">
+                        <button id="importCsvBtn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">Import to Collection</button>
+                        <button id="importAndAddBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Import & Add to Deck</button>
+                    </div>
+                    </div>
             </div>
         </div>
         <!-- Scryfall Import Tab -->
@@ -503,6 +506,7 @@
         let myUserId = null;
         let editingCardId = null; 
         let csvFileToProcess = null;
+        let importAndAddBtn = null;
         let fetchedCardsData = []; // To store the processed card data for CSV/direct export
         let isSelectMode = false;
         let selectedCards = new Set();
@@ -1596,107 +1600,122 @@
             }
         };
 
-        const handleCsvImport = () => {
-            const file = csvFileToProcess;
-            if (!file) {
-                showMessage("Please select a CSV file to import.", true, 'import');
-                return;
-            }
-            showMessage("Parsing CSV file...", false, 'import');
-            Papa.parse(file, {
-                header: true,
-                skipEmptyLines: true,
-                complete: async (results) => {
-                    if (results.errors && results.errors.length > 0) {
-                        const errorMessages = results.errors.map(e => `Row ${e.row}: ${e.message}`).join('\n');
-                        showMessage(`CSV parsing failed. Errors:\n${errorMessages}`, true, 'import');
-                        return;
-                    }
+        const handleCsvImport = (showSummaryModal = true) => {
+            return new Promise(async (resolve, reject) => {
+                const file = csvFileToProcess;
+                if (!file) {
+                    showMessage("Please select a CSV file to import.", true, 'import');
+                    return reject("No file selected");
+                }
+                if(showSummaryModal) showMessage("Parsing CSV file...", false, 'import');
 
-                    const cardsToCreate = [];
-                    const skippedCardNames = []; // Track skipped card names
-                    const importedCardNames = []; // Track imported card names
-                    const errors = [];
-                    const existingCardNames = new Set(allCards.map(c => c.name.toLowerCase()));
-                    const namesInThisImport = new Set();
-
-                    for (const row of results.data) {
-                        const cardName = row['Card Name']?.trim();
-                        const cardType = row['Card Type']?.trim();
-                        if (!cardName || !cardType) {
-                            errors.push(`Skipping row with missing Card Name or Card Type.`);
-                            continue;
-                        }
-                        if (cardType === 'Creature' && (!row['Power'] || !row['Toughness'])) {
-                            errors.push(`Skipping Creature "${cardName}" with missing Power or Toughness.`);
-                            skippedCardNames.push(`${cardName} (Missing Power/Toughness)`);
-                            continue;
+                Papa.parse(file, {
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: async (results) => {
+                        if (results.errors && results.errors.length > 0) {
+                            const errorMessages = results.errors.map(e => `Row ${e.row}: ${e.message}`).join('\n');
+                            showMessage(`CSV parsing failed...`, true, 'import');
+                            return reject(new Error("CSV Parsing failed"));
                         }
 
-                        const lowerCaseCardName = cardName.toLowerCase();
-                        if (!isBasicLand(cardName, cardType) && (existingCardNames.has(lowerCaseCardName) || namesInThisImport.has(lowerCaseCardName))) {
-                            skippedCardNames.push(`${cardName} (Duplicate)`);
-                            continue; 
+                        const cardsToCreate = [];
+                        const skippedCardNames = [];
+                        const importedCardNames = [];
+                        const errors = [];
+                        const existingCardNames = new Set(allCards.map(c => c.name.toLowerCase()));
+                        const namesInThisImport = new Set();
+
+                        for (const row of results.data) {
+                            const cardName = row['Card Name']?.trim();
+                            const cardType = row['Card Type']?.trim();
+                            if (!cardName || !cardType) {
+                                errors.push(`Skipping row with missing Card Name or Card Type.`);
+                                continue;
+                            }
+                            if (cardType === 'Creature' && (!row['Power'] || !row['Toughness'])) {
+                                skippedCardNames.push(`${cardName} (Missing P/T)`);
+                                continue;
+                            }
+                            const lowerCaseCardName = cardName.toLowerCase();
+                            if (!isBasicLand(cardName, cardType) && (existingCardNames.has(lowerCaseCardName) || namesInThisImport.has(lowerCaseCardName))) {
+                                skippedCardNames.push(`${cardName} (Duplicate)`);
+                                continue; 
+                            }
+                            namesInThisImport.add(lowerCaseCardName);
+                            const cardData = {
+                                name: cardName, type: cardType, source: 'custom',
+                                subtype: row['Card Subtype']?.trim() || '',
+                                cost: row['Mana Cost']?.trim() || '',
+                                text: row['Text Box']?.trim() || '',
+                                flavourText: row['Flavour Text']?.trim() || '',
+                                imageUrl: row['Image Filename']?.trim() ? (uploadedImageMap.get(row['Image Filename'].trim()) || null) : null,
+                                power: row['Power']?.trim() || null,
+                                toughness: row['Toughness']?.trim() || null,
+                                loyalty: row['Starting Loyalty']?.trim() || null
+                            };
+                            cardsToCreate.push(cardData);
+                            importedCardNames.push(cardName);
                         }
-                        namesInThisImport.add(lowerCaseCardName);
 
-                        const cardData = {
-                            name: cardName,
-                            type: cardType,
-                            source: 'custom',
-                            subtype: row['Card Subtype']?.trim() || '',
-                            cost: row['Mana Cost']?.trim() || '',
-                            text: row['Text Box']?.trim() || '',
-                            flavourText: row['Flavour Text']?.trim() || '',
-                            imageUrl: row['Image Filename']?.trim() ? (uploadedImageMap.get(row['Image Filename'].trim()) || null) : null,
-                            power: row['Power']?.trim() || null,
-                            toughness: row['Toughness']?.trim() || null,
-                            loyalty: row['Starting Loyalty']?.trim() || null
-                        };
-                        cardsToCreate.push(cardData);
-                        importedCardNames.push(cardName);
-                    }
-
-                    if (errors.length > 0) showMessage(errors.join('\n'), true, 'import');
-
-                    if (cardsToCreate.length > 0) {
-                        try {
-                            const batch = db.batch();
-                            cardsToCreate.forEach(cardData => {
-                                const docRef = db.collection('users').doc(myUserId).collection('cards').doc();
-                                batch.set(docRef, cardData);
-                            });
-                            await batch.commit();
-                            await loadAllCardsFromFirebase();
-                        } catch (error) {
-                            console.error("Error saving cards to Firestore:", error);
-                            showMessage("An error occurred while saving new cards.", true, 'import');
-                            return; // Stop if saving fails
+                        if (cardsToCreate.length > 0) {
+                            try {
+                                const batch = db.batch();
+                                cardsToCreate.forEach(cardData => {
+                                    const docRef = db.collection('users').doc(myUserId).collection('cards').doc();
+                                    batch.set(docRef, cardData);
+                                });
+                                await batch.commit();
+                                await loadAllCardsFromFirebase();
+                            } catch (error) {
+                                console.error("Error saving cards to Firestore:", error);
+                                showMessage("An error occurred while saving new cards.", true, 'import');
+                                return reject(error);
+                            }
                         }
-                    }
 
-                    // --- NEW: Generate the clickable summary message ---
-                    const importMessageArea = document.getElementById('import-message-area');
-                    let summaryHTML = `<span>Import complete: </span>`;
-                    if (importedCardNames.length > 0) {
-                        summaryHTML += `<span id="show-imported-summary" class="font-bold text-green-400 cursor-pointer hover:underline">${importedCardNames.length} imported</span>`;
-                    }
-                    if (skippedCardNames.length > 0) {
-                        summaryHTML += `, <span id="show-skipped-summary" class="font-bold text-yellow-400 cursor-pointer hover:underline">${skippedCardNames.length} skipped</span>`;
-                    }
-                    importMessageArea.innerHTML = summaryHTML;
-                    importMessageArea.classList.remove('hidden');
+                        if (showSummaryModal) {
+                            const importMessageArea = document.getElementById('import-message-area');
+                            let summaryHTML = `<span>Import complete: </span>`;
+                            if (importedCardNames.length > 0) {
+                                summaryHTML += `<span id="show-imported-summary" class="font-bold text-green-400 cursor-pointer hover:underline">${importedCardNames.length} imported</span>`;
+                            }
+                            if (skippedCardNames.length > 0) {
+                                summaryHTML += `, <span id="show-skipped-summary" class="font-bold text-yellow-400 cursor-pointer hover:underline">${skippedCardNames.length} skipped</span>`;
+                            }
+                            importMessageArea.innerHTML = summaryHTML;
+                            importMessageArea.classList.remove('hidden');
+                            document.getElementById('show-imported-summary')?.addEventListener('click', () => showImportSummaryModal('Successfully Imported Cards', importedCardNames));
+                            document.getElementById('show-skipped-summary')?.addEventListener('click', () => showImportSummaryModal('Skipped Cards', skippedCardNames));
+                        }
 
-                    // Attach listeners to the new summary links
-                    document.getElementById('show-imported-summary')?.addEventListener('click', () => {
-                        showImportSummaryModal('Successfully Imported Cards', importedCardNames);
-                    });
-                    document.getElementById('show-skipped-summary')?.addEventListener('click', () => {
-                        showImportSummaryModal('Skipped Cards', skippedCardNames);
-                    });
-                },
-                error: (err) => showMessage(`Error parsing CSV file: ${err.message}.`, true, 'import')
+                        // Resolve the promise with the names of newly created cards
+                        resolve(importedCardNames); 
+                    },
+                    error: (err) => {
+                        showMessage(`Error parsing CSV file: ${err.message}.`, true, 'import');
+                        reject(err);
+                    }
+                });
             });
+        };
+
+        const handleCsvImportAndAddToDeck = async () => {
+            try {
+                // Call the import function and tell it NOT to show the summary modal
+                const importedCardNames = await handleCsvImport(false);
+
+                // Clear previous selections and add the new card names
+                importSelectedCards.clear();
+                fetchedCardsData = allCards.filter(c => importedCardNames.includes(c.name));
+                importedCardNames.forEach(name => importSelectedCards.add(name));
+
+                // Open the "Add to Deck" modal
+                openAddToDeckModal('import');
+            } catch (error) {
+                console.log("Import process cancelled or failed.", error);
+                // Error messages are already handled by handleCsvImport
+            }
         };
 
         // --- SCRYFALL IMPORT LOGIC ---
@@ -2057,6 +2076,7 @@
                         joinGameIdInput = document.getElementById('joinGameIdInput');
                         messageAreaEl = document.getElementById('message-area');
                         importCsvBtn = document.getElementById('importCsvBtn');
+                        importAndAddBtn = document.getElementById('importAndAddBtn'); 
                         imageUploadProgressEl = document.getElementById('image-upload-progress');
                         lobbySectionEl = document.getElementById('lobby-section');
                         lobbyControlsEl = document.getElementById('lobby-controls');
@@ -2174,7 +2194,8 @@
                                 csvFileToProcess = event.target.files[0];
                             }
                         });
-                        importCsvBtn.addEventListener('click', handleCsvImport);
+                        importCsvBtn.addEventListener('click', () => handleCsvImport(true));
+                        importAndAddBtn.addEventListener('click', handleCsvImportAndAddToDeck); // ADD THIS LINE
                         fetchBtn.addEventListener('click', handleFetchClick);
                         downloadCsvBtn.addEventListener('click', () => {
                             const csv = convertToCSV(fetchedCardsData);
