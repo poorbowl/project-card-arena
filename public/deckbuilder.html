@@ -335,7 +335,14 @@
                         <p class="text-gray-500">Right-click a card in the deck below to set as commander.</p>
                     </div>
                 </div>
-                <h3 class="text-lg font-semibold text-gray-300">Main Deck (<span id="deckCount">0</span>)</h3>
+                <div class="flex justify-between items-center">
+                    <h3 class="text-lg font-semibold text-gray-300">Main Deck (<span id="deckCount">0</span>)</h3>
+                    <select id="sortDeckSelect" class="bg-gray-700 border border-gray-600 rounded-md shadow-sm py-1 px-2 text-white text-xs focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="name">Sort by Name</option>
+                        <option value="type">Sort by Type</option>
+                        <option value="mv">Sort by MV</option>
+                    </select>
+                </div>
                 <div id="deckList" class="min-h-[200px] bg-gray-800 p-2 rounded-md"></div>
             </div>
             <div class="bg-gray-900 p-4 rounded-lg">
@@ -460,7 +467,7 @@
 </div>
     <script>
     // --- DOM Elements (Declared Globally) ---
-    let cardCollectionEl, deckListEl, commanderListEl, deckCountEl, deckNameEl, saveDeckBtn, clearDeckBtn, savedDecksEl,
+    let cardCollectionEl, deckListEl, commanderListEl, deckCountEl, deckNameEl, saveDeckBtn, clearDeckBtn, sortDeckSelect, savedDecksEl,
         saveCardBtn, cancelEditBtn, formTitleEl, cardTypeSelect, creatureFields, planeswalkerFields,
         createGameBtn, joinGameBtn, joinGameIdInput, messageAreaEl, importCsvBtn, imageUploadProgressEl,
         lobbySectionEl, lobbyControlsEl, gameCreatedSectionEl, inviteLinkInputEl, copyLinkBtn, enterGameBtn,
@@ -486,6 +493,7 @@
         let isSelectMode = false;
         let selectedCards = new Set();
         let importSelectedCards = new Set();
+        let deckSortOrder = 'name'; 
         let currentPage = 1;
         const cardsPerPage = 20; // You can change this number to show more or fewer cards
         let currentView = 'grid'; // Can be 'grid' or 'list'
@@ -870,13 +878,32 @@
                 return acc;
             }, {});
 
-            Object.keys(cardCounts).forEach(cardId => {
-                const card = allCards.find(c => c.id == cardId);
-                if (card) {
+            // Create an array of unique card objects that includes their count
+            let uniqueCards = Object.keys(cardCounts).map(cardId => {
+                const card = allCards.find(c => c.id === cardId);
+                // Ensure the mana value is calculated for sorting
+                if (card && card.mv === undefined) {
+                    card.mv = getManaValue(card.cost);
+                }
+                return { ...card, count: cardCounts[cardId] };
+            });
+
+            // Now, sort the array of unique cards
+            if (deckSortOrder === 'name') {
+                uniqueCards.sort((a, b) => a.name.localeCompare(b.name));
+            } else if (deckSortOrder === 'type') {
+                uniqueCards.sort((a, b) => a.type.localeCompare(b.type) || a.name.localeCompare(b.name));
+            } else if (deckSortOrder === 'mv') {
+                uniqueCards.sort((a, b) => a.mv - b.mv || a.name.localeCompare(b.name));
+            }
+
+            // Finally, iterate over the *sorted* array to render the list
+            uniqueCards.forEach(card => {
+                if (card && card.id) { // Check for card.id to filter out any potential bad data
                     const deckItem = document.createElement('div');
                     deckItem.className = 'deck-item text-sm p-1 flex justify-between items-center';
-                    deckItem.textContent = `${cardCounts[cardId]}x ${card.name}`;
-                    
+                    deckItem.textContent = `${card.count}x ${card.name}`;
+
                     deckItem.addEventListener('contextmenu', (e) => {
                         e.preventDefault();
                         setCommander(card);
@@ -890,6 +917,7 @@
                     deckListEl.appendChild(deckItem);
                 }
             });
+
             renderCommanders();
         };
 
@@ -1307,6 +1335,11 @@
         const unsetCommander = (cardId) => {
             commanders = commanders.filter(c => c.id !== cardId);
             renderDeckList();
+        };
+
+        const handleSortDeck = (event) => {
+            deckSortOrder = event.target.value; // Get the selected value from the dropdown
+            renderDeckList(); // Re-render the deck with the new sort order
         };
 
         const handleClearDeck = () => {
@@ -1961,6 +1994,7 @@
                         deckNameEl = document.getElementById('deckName');
                         saveDeckBtn = document.getElementById('saveDeck');
                         clearDeckBtn = document.getElementById('clearDeckBtn');
+                        sortDeckSelect = document.getElementById('sortDeckSelect');
                         savedDecksEl = document.getElementById('savedDecks');
                         saveCardBtn = document.getElementById('saveCardBtn');
                         cancelEditBtn = document.getElementById('cancelEditBtn');
@@ -2077,6 +2111,7 @@
                         cancelEditBtn.addEventListener('click', resetForm);
                         saveDeckBtn.addEventListener('click', handleSaveDeck);
                         clearDeckBtn.addEventListener('click', handleClearDeck);
+                        sortDeckSelect.addEventListener('change', handleSortDeck);
                         createGameBtn.addEventListener('click', handleCreateGame);
                         joinGameBtn.addEventListener('click', handleJoinGame);
                         copyLinkBtn.addEventListener('click', handleCopyLink);
