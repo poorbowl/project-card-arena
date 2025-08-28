@@ -465,6 +465,20 @@
         </div>
     </div>
 </div>
+
+<!-- Modal for Import Summaries -->
+<div id="import-summary-modal" class="hidden fixed inset-0 bg-black/80 z-[70] flex items-center justify-center p-4">
+    <div class="bg-gray-800 rounded-lg max-w-md w-full p-6 shadow-2xl border border-indigo-500 flex flex-col max-h-[80vh]">
+        <div class="flex justify-between items-center mb-4 flex-shrink-0">
+            <h2 id="import-summary-title" class="text-2xl font-bold text-indigo-300">Import Summary</h2>
+            <button id="import-summary-close-btn" class="text-3xl font-light text-gray-400 hover:text-white leading-none">&times;</button>
+        </div>
+        <ul id="import-summary-list" class="space-y-1 text-sm text-gray-300 overflow-y-auto">
+            <!-- Card names will be dynamically inserted here -->
+        </ul>
+    </div>
+</div>
+
     <script>
     // --- DOM Elements (Declared Globally) ---
     let cardCollectionEl, deckListEl, commanderListEl, deckCountEl, deckNameEl, saveDeckBtn, clearDeckBtn, sortDeckSelect, savedDecksEl,
@@ -1595,13 +1609,14 @@
                 complete: async (results) => {
                     if (results.errors && results.errors.length > 0) {
                         const errorMessages = results.errors.map(e => `Row ${e.row}: ${e.message}`).join('\n');
-                        showMessage(`CSV parsing failed. Please check the file format. Errors:\n${errorMessages}`, true, 'import');
+                        showMessage(`CSV parsing failed. Errors:\n${errorMessages}`, true, 'import');
                         return;
                     }
 
                     const cardsToCreate = [];
+                    const skippedCardNames = []; // Track skipped card names
+                    const importedCardNames = []; // Track imported card names
                     const errors = [];
-                    let skippedCount = 0;
                     const existingCardNames = new Set(allCards.map(c => c.name.toLowerCase()));
                     const namesInThisImport = new Set();
 
@@ -1614,12 +1629,13 @@
                         }
                         if (cardType === 'Creature' && (!row['Power'] || !row['Toughness'])) {
                             errors.push(`Skipping Creature "${cardName}" with missing Power or Toughness.`);
+                            skippedCardNames.push(`${cardName} (Missing Power/Toughness)`);
                             continue;
                         }
 
                         const lowerCaseCardName = cardName.toLowerCase();
                         if (!isBasicLand(cardName, cardType) && (existingCardNames.has(lowerCaseCardName) || namesInThisImport.has(lowerCaseCardName))) {
-                            skippedCount++;
+                            skippedCardNames.push(`${cardName} (Duplicate)`);
                             continue; 
                         }
                         namesInThisImport.add(lowerCaseCardName);
@@ -1638,10 +1654,11 @@
                             loyalty: row['Starting Loyalty']?.trim() || null
                         };
                         cardsToCreate.push(cardData);
+                        importedCardNames.push(cardName);
                     }
 
                     if (errors.length > 0) showMessage(errors.join('\n'), true, 'import');
-                    
+
                     if (cardsToCreate.length > 0) {
                         try {
                             const batch = db.batch();
@@ -1650,20 +1667,33 @@
                                 batch.set(docRef, cardData);
                             });
                             await batch.commit();
-                            
-                            let successMessage = `Successfully imported ${cardsToCreate.length} new cards!`;
-                            if (skippedCount > 0) successMessage += ` Skipped ${skippedCount} duplicate cards.`;
-                            showMessage(successMessage, false, 'import');
                             await loadAllCardsFromFirebase();
                         } catch (error) {
                             console.error("Error saving cards to Firestore:", error);
                             showMessage("An error occurred while saving new cards.", true, 'import');
+                            return; // Stop if saving fails
                         }
-                    } else {
-                         let message = "No new cards were imported.";
-                         if (skippedCount > 0) message += ` Skipped ${skippedCount} duplicate cards.`
-                         showMessage(message, false, 'import');
                     }
+
+                    // --- NEW: Generate the clickable summary message ---
+                    const importMessageArea = document.getElementById('import-message-area');
+                    let summaryHTML = `<span>Import complete: </span>`;
+                    if (importedCardNames.length > 0) {
+                        summaryHTML += `<span id="show-imported-summary" class="font-bold text-green-400 cursor-pointer hover:underline">${importedCardNames.length} imported</span>`;
+                    }
+                    if (skippedCardNames.length > 0) {
+                        summaryHTML += `, <span id="show-skipped-summary" class="font-bold text-yellow-400 cursor-pointer hover:underline">${skippedCardNames.length} skipped</span>`;
+                    }
+                    importMessageArea.innerHTML = summaryHTML;
+                    importMessageArea.classList.remove('hidden');
+
+                    // Attach listeners to the new summary links
+                    document.getElementById('show-imported-summary')?.addEventListener('click', () => {
+                        showImportSummaryModal('Successfully Imported Cards', importedCardNames);
+                    });
+                    document.getElementById('show-skipped-summary')?.addEventListener('click', () => {
+                        showImportSummaryModal('Skipped Cards', skippedCardNames);
+                    });
                 },
                 error: (err) => showMessage(`Error parsing CSV file: ${err.message}.`, true, 'import')
             });
@@ -1732,6 +1762,26 @@
             importSelectedCards.clear();
         }
 
+        function showImportSummaryModal(title, cardNames) {
+            const modal = document.getElementById('import-summary-modal');
+            const titleEl = document.getElementById('import-summary-title');
+            const listEl = document.getElementById('import-summary-list');
+
+            titleEl.textContent = title;
+            listEl.innerHTML = ''; // Clear previous list
+
+            if (cardNames.length === 0) {
+                listEl.innerHTML = '<li>No cards to show.</li>';
+            } else {
+                cardNames.forEach(name => {
+                    const li = document.createElement('li');
+                    li.textContent = name;
+                    listEl.appendChild(li);
+                });
+            }
+            modal.classList.remove('hidden');
+        }
+        
         const handleConfirmImport = async () => {
             if (importSelectedCards.size === 0) {
                 showMessage("No cards selected.", true, 'scryfall');
@@ -2026,6 +2076,9 @@
                         addDirectlyBtn = document.getElementById('addDirectlyBtn');
                         importReviewModal = document.getElementById('import-review-modal');
                         importReviewClose = document.getElementById('import-review-close');
+                        document.getElementById('import-summary-close-btn').addEventListener('click', () => {
+                            document.getElementById('import-summary-modal').classList.add('hidden');
+                        });
                         importSelectAllBtn = document.getElementById('import-select-all-btn');
                         importDeselectAllBtn = document.getElementById('import-deselect-all-btn');
                         importSelectionCountEl = document.getElementById('import-selection-count');
