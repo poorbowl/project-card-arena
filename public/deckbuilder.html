@@ -305,6 +305,9 @@
                     <option value="mv_desc">Sort: Mana Value (High-Low)</option>
                 </select>
                 <div class="flex-grow"></div> <!-- This is a spacer to push the new button to the right -->
+                <button id="clear-filters-btn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg"> <!-- Adds a Clear Filters button -->
+                    Clear Filters
+                </button>
                 <button id="toggle-select-mode-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
                     Select
                 </button>
@@ -543,6 +546,7 @@
         let currentView = 'grid'; // Can be 'grid' or 'list'
         let currentlyVisibleCards = [];
         let savedDecksData = new Map();
+        let clearFiltersBtn;
         let jumpToPageInput, cardsPerPageSelect;
 
         // --- MESSAGE FUNCTIONS ---
@@ -624,6 +628,21 @@
             renderFilteredCollection(); // Re-render to remove all selection highlights
         };
 
+        // Function that resets all filters when selected
+        const handleClearFilters = () => {
+            filterNameInput.value = '';
+            filterTypeSelect.value = '';
+            filterColorSelect.value = '';
+            filterSourceSelect.value = '';
+            filterDeckSelect.value = '';
+            manaValueOperator.value = '=';
+            manaValueFilter.value = '';
+            filterSortSelect.value = 'name_asc';
+
+            // Re-render the collection with the cleared filters
+            renderFilteredCollection();
+        };
+        
         // --- RENDER FUNCTIONS ---
         // NEW (Corrected): This function parses a mana cost string and returns HTML for the symbols.
         const parseManaCost = (cost, symbolClass = '') => {
@@ -2251,6 +2270,7 @@
                         selectionCountEl = document.getElementById('selection-count');
                         deleteSelectedBtn = document.getElementById('delete-selected-btn');
                         addSelectedToDeckBtn = document.getElementById('add-selected-to-deck-btn');
+                        clearFiltersBtn = document.getElementById('clear-filters-btn');
                         selectAllBtn = document.getElementById('select-all-btn');
                         deselectAllBtn = document.getElementById('deselect-all-btn');
                         cardPopoutEl = document.getElementById('card-popout');
@@ -2361,6 +2381,7 @@
                         toggleSelectModeBtn.addEventListener('click', toggleSelectMode);
                         deleteSelectedBtn.addEventListener('click', handleDeleteSelected);
                         addSelectedToDeckBtn.addEventListener('click', () => openAddToDeckModal('collection'));
+                        clearFiltersBtn.addEventListener('click', handleClearFilters);
                         selectAllBtn.addEventListener('click', handleSelectAllOnPage);
                         deselectAllBtn.addEventListener('click', handleDeselectAll);
                         addToDeckCloseBtn.addEventListener('click', () => {
