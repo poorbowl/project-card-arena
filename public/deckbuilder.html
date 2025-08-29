@@ -1689,7 +1689,8 @@
             const zipFile = event.target.files[0];
             if (!zipFile) return;
 
-            imageUploadProgressEl.textContent = `Unzipping and uploading images...`;
+            imageUploadProgressEl.textContent = `Reading zip file...`;
+            imageUploadProgressEl.style.color = '#9ca3af'; // Default text-gray-400
             uploadedImageMap.clear();
 
             try {
@@ -1702,7 +1703,15 @@
                     }
                 });
 
-                imageUploadProgressEl.textContent = `Found ${imageFiles.length} images. Uploading...`;
+                if (imageFiles.length === 0) {
+                    imageUploadProgressEl.textContent = "No image files found in the zip.";
+                    imageUploadProgressEl.style.color = '#f87171'; // red-400
+                    return;
+                }
+
+                let completedUploads = 0;
+                const totalImages = imageFiles.length;
+                imageUploadProgressEl.textContent = `Uploading 0/${totalImages} (0%)...`;
 
                 const uploadPromises = imageFiles.map(file => {
                     return file.async('blob').then(blob => {
@@ -1710,18 +1719,22 @@
                         return imageRef.put(blob).then(uploadTask => {
                             return uploadTask.ref.getDownloadURL().then(imageUrl => {
                                 uploadedImageMap.set(file.name, imageUrl);
+                                // --- NEW: Update progress after each successful upload ---
+                                completedUploads++;
+                                const percentage = Math.round((completedUploads / totalImages) * 100);
+                                imageUploadProgressEl.textContent = `Uploading ${completedUploads}/${totalImages} (${percentage}%)...`;
                             });
                         });
                     });
                 });
 
                 await Promise.all(uploadPromises);
-                imageUploadProgressEl.textContent = `Successfully uploaded ${imageFiles.length} images. Ready for CSV import.`;
-                imageUploadProgressEl.style.color = '#4ade80';
+                imageUploadProgressEl.textContent = `Successfully uploaded ${totalImages} images. Ready for CSV import.`;
+                imageUploadProgressEl.style.color = '#4ade80'; // green-400
             } catch (error) {
                 console.error("Error processing zip file:", error);
                 imageUploadProgressEl.textContent = "An error occurred during zip processing.";
-                imageUploadProgressEl.style.color = '#f87171';
+                imageUploadProgressEl.style.color = '#f87171'; // red-400
             }
         };
 
