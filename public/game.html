@@ -1019,6 +1019,8 @@
                 hideContextMenu();
                 let menuHTML = `
                     <div>
+                        <button class="context-menu-button text-white" data-action="draw-opening-hand">Draw Opening Hand</button>
+                        <div class="context-menu-divider"></div>
                         <button class="context-menu-button text-white" data-action="search-library">Search</button>
                         <button class="context-menu-button text-white" data-action="shuffle-library">Shuffle</button>
                         <div class="context-menu-divider"></div>
@@ -1076,6 +1078,8 @@
                     moveCardToZone(toZone);
                 } else if (action === 'delete-token') {
                     deleteToken();
+                } else if (action === 'draw-opening-hand') { // ADD THIS BLOCK
+                    handleDrawOpeningHand();    
                 } else if (action === 'search-library') {
                     openLibrarySearch();
                 } else if (action === 'shuffle-library') {
@@ -1572,6 +1576,35 @@
                     }
                 }
             }
+
+            const handleDrawOpeningHand = () => {
+                const playerRef = gameRef.child('players').child(myPlayerId);
+
+                playerRef.transaction(playerState => {
+                    if (playerState && playerState.deck && playerState.deck.length >= 7) {
+                        // Peek at the top 7 cards without removing them yet
+                        const openingHand = playerState.deck.slice(-7);
+
+                        // Count the lands
+                        const landCount = openingHand.filter(card => card && card.type && card.type.includes('Land')).length;
+
+                        // Use a confirm dialog to ask the player
+                        if (confirm(`Your opening hand has ${landCount} lands. Keep this hand?`)) {
+                            // Player keeps the hand: move the cards from deck to hand
+                            playerState.deck.splice(-7, 7); // Remove top 7 from deck
+                            if (!playerState.hand) playerState.hand = [];
+                            playerState.hand.push(...openingHand);
+                        } else {
+                            // Player mulligans: just shuffle the deck. The cards are not moved.
+                            shuffle(playerState.deck);
+                        }
+                    } else {
+                        // Not enough cards to draw a hand
+                        alert("You need at least 7 cards in your library to draw an opening hand.");
+                    }
+                    return playerState; // Return the modified (or unmodified) state
+                });
+            };
 
             function openInteractiveZoneViewer(mode, count) {
                 const playerState = gameState.players[myPlayerId];
