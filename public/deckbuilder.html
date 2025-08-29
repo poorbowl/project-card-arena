@@ -258,13 +258,14 @@
                 <input type="text" id="filterName" placeholder="Filter by name..." class="flex-grow bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 min-w-[200px]">
                 <select id="filterType" class="bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
                     <option value="">All Types</option>
+                    <option>Artifact</option>
+                    <option>Basic Land</option>
                     <option>Creature</option>
+                    <option>Enchantment</option>
+                    <option>Instant</option>
+                    <option>Land</option>
                     <option>Planeswalker</option>
                     <option>Sorcery</option>
-                    <option>Instant</option>
-                    <option>Enchantment</option>
-                    <option>Artifact</option>
-                    <option>Land</option>
                 </select>
                 <select id="filterColor" class="bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
                     <option value="">All Colors</option>
@@ -890,7 +891,18 @@
             if (nameQuery) filteredCards = filteredCards.filter(card => card.name.toLowerCase().includes(nameQuery));
 
             const typeQuery = filterTypeSelect.value;
-            if (typeQuery) filteredCards = filteredCards.filter(card => card.type === typeQuery);
+            if (typeQuery) {
+                if (typeQuery === 'Basic Land') {
+                    // Use our existing helper function to find only basic lands
+                    filteredCards = filteredCards.filter(card => isBasicLand(card.name, card.type));
+                } else if (typeQuery === 'Land') {
+                    // When "Land" is selected, show all lands that are NOT basic
+                    filteredCards = filteredCards.filter(card => card.type === 'Land' && !isBasicLand(card.name, card.type));
+                } else {
+                    // For all other types, use the original logic
+                    filteredCards = filteredCards.filter(card => card.type === typeQuery);
+                }
+            }
 
             const colorQuery = filterColorSelect.value;
             if (colorQuery) filteredCards = filteredCards.filter(card => getCardColorIdentity(card.cost).includes(colorQuery));
@@ -1099,7 +1111,7 @@
         }
 
         const isBasicLand = (cardName, cardType) => {
-            if (cardType !== 'Land') return false;
+            if (cardType !== 'Land' && cardType !== 'Basic Land') return false;
             const basicLandNames = ['plains', 'island', 'swamp', 'mountain', 'forest'];
             const lowerCaseName = cardName.toLowerCase();
             return basicLandNames.some(name => lowerCaseName === name || lowerCaseName === `snow-covered ${name}`);
