@@ -1222,34 +1222,46 @@
             function handleCardMouseOver(event) {
                 const instanceId = event.currentTarget.dataset.instanceId;
                 const cardData = cardDataMap.get(instanceId);
-                if (cardData && !cardData.isToken) {
-                    popoutNameEl.textContent = cardData.name;
-                    popoutCostEl.innerHTML = parseManaCost(cardData.cost);
-                    popoutImgEl.src = cardData.imageUrl;
-                    
-                    let typeLine = cardData.type || '';
-                    if (cardData.subtype) {
-                        typeLine += ` — ${cardData.subtype}`;
-                    }
-                    popoutTypeEl.textContent = typeLine;
-                    
-                    popoutTextEl.innerHTML = (cardData.text || '').replace(/\n/g, '<br>');
-                    
-                    if (cardData.flavourText) {
-                        popoutFlavourTextEl.innerHTML = (cardData.flavourText || '').replace(/\n/g, '<br>');
-                        popoutFlavourTextEl.classList.remove('hidden');
-                    } else {
-                        popoutFlavourTextEl.classList.add('hidden');
-                    }
-                    
-                    if (cardData.power && cardData.toughness) {
-                        popoutPtEl.textContent = `${cardData.power}/${cardData.toughness}`;
-                    } else if (cardData.loyalty) {
-                        popoutPtEl.textContent = `Loyalty: ${cardData.loyalty}`;
-                    } else {
-                        popoutPtEl.textContent = '';
-                    }
 
+                if (cardData) { // This now runs for any card or token
+                    popoutNameEl.textContent = cardData.name;
+                    popoutImgEl.src = cardData.imageUrl || 'https://placehold.co/280x200/2d3748/e2e8f0?text=Token';
+
+                    if (cardData.isToken) {
+                        // TOKEN LOGIC: Show token-specific info
+                        popoutTypeEl.textContent = "Token";
+                        if (cardData.subtype) {
+                        popoutTypeEl.textContent += ` — ${cardData.subtype}`;
+                        }
+                        popoutCostEl.innerHTML = ''; // Tokens have no mana cost
+                        popoutTextEl.innerHTML = (cardData.text || '').replace(/\n/g, '<br>');
+                        popoutFlavourTextEl.style.display = 'none';
+                        popoutPtEl.textContent = cardData.pt || '';
+                    } else {
+                        // REGULAR CARD LOGIC: Use the existing logic
+                        popoutCostEl.innerHTML = parseManaCost(cardData.cost);
+                        let typeLine = cardData.type || '';
+                        if (cardData.subtype) {
+                            typeLine += ` — ${cardData.subtype}`;
+                        }
+                        popoutTypeEl.textContent = typeLine;
+                        popoutTextEl.innerHTML = (cardData.text || '').replace(/\n/g, '<br>');
+
+                        if (cardData.flavourText) {
+                            popoutFlavourTextEl.innerHTML = (cardData.flavourText || '').replace(/\n/g, '<br>');
+                            popoutFlavourTextEl.classList.remove('hidden');
+                        } else {
+                            popoutFlavourTextEl.classList.add('hidden');
+                        }
+
+                        if (cardData.power && cardData.toughness) {
+                            popoutPtEl.textContent = `${cardData.power}/${cardData.toughness}`;
+                        } else if (cardData.loyalty) {
+                            popoutPtEl.textContent = `Loyalty: ${cardData.loyalty}`;
+                        } else {
+                            popoutPtEl.textContent = '';
+                        }
+                    }
                     cardPopoutEl.classList.remove('hidden');
                 }
             }
