@@ -1900,10 +1900,10 @@
                     return;
                 }
                 const button = event.target.closest('button[data-player-id]');
-                if (button) {
-                    handleLifeChange(button.dataset.playerId, button.dataset.action);
-                }
-            });
+                    if (button && button.dataset.playerId === myPlayerId) {
+                        handleLifeChange(button.dataset.playerId, button.dataset.action);
+                    }
+                });
             mainGridEl.addEventListener('change', (event) => {
                 if (event.target.id === `${myPlayerId}-life-total`) {
                     handleLifeTextEntry(event);
