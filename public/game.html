@@ -1084,6 +1084,20 @@
                 if (action === 'change-counter') {
                     const name = button.dataset.name;
                     const amount = parseInt(button.dataset.amount, 10);
+
+                    // --- Counters update the menu text automatically ---
+                    const counterSpan = button.parentElement.previousElementSibling;
+                    if (counterSpan) {
+                        let currentCount = parseInt(counterSpan.textContent.match(/\((\d+)\)/)[1], 10);
+                        let newCount = currentCount + amount;
+                        if (newCount > 0) {
+                            counterSpan.textContent = `${decodeFirebaseKey(name)} (${newCount})`;
+                        } else {
+                            // If the count drops to 0 or below, remove the entire line item
+                            counterSpan.parentElement.remove();
+                        }
+                    }
+
                     changeCounter(name, amount);
                 } else if (action === 'add-counter') {
                     const counterName = document.getElementById('new-counter-name').value.trim();
@@ -1131,11 +1145,38 @@
                     }
                     return playerState;
                 });
-                hideContextMenu();
             }
 
             function addNewCounter(counterName) {
                 if (!contextMenuCard) return;
+
+                const countersMenu = document.getElementById('counters-menu');
+                const newCounterNameInput = document.getElementById('new-counter-name');
+                const noCountersMessage = countersMenu.querySelector('.text-gray-400');
+
+                // If the "No counters" message is there, remove it
+                if (noCountersMessage) {
+                    noCountersMessage.remove();
+                }
+
+                const encodedNameForUI = encodeFirebaseKey(counterName);
+                const newItemHTML = `
+                    <div class="context-menu-item">
+                        <span class="mr-2 truncate">${counterName} (1)</span>
+                        <div class="flex items-center gap-2">
+                            <button data-action="change-counter" data-name="${encodedNameForUI}" data-amount="-1" class="flex items-center justify-center bg-gray-600 w-6 h-6 rounded-full">-</button>
+                            <button data-action="change-counter" data-name="${encodedNameForUI}" data-amount="1" class="flex items-center justify-center bg-gray-600 w-6 h-6 rounded-full">+</button>
+                        </div>
+                    </div>`;
+
+                // Insert the new counter before the divider
+                const divider = countersMenu.querySelector('.context-menu-divider');
+                if (divider) {
+                    divider.insertAdjacentHTML('beforebegin', newItemHTML);
+                }
+
+                newCounterNameInput.value = ''; // Clear the input box
+
                 const encodedName = encodeFirebaseKey(counterName);
                 const playerRef = gameRef.child('players').child(myPlayerId);
                 playerRef.transaction(playerState => {
@@ -1148,7 +1189,6 @@
                     }
                     return playerState;
                 });
-                hideContextMenu();
             }
             
             function moveCardToZone(toZoneId) {
