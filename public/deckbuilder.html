@@ -1374,7 +1374,10 @@
             const gamesRef = realdb.ref('games');
             const newGameRef = gamesRef.push(); 
 
-            const mainDeckForGame = currentDeck.filter(card => !commanders.some(c => c.id === card.id));
+            const mainDeckForGame = currentDeck.filter(card => !commanders.some(c => c.id === card.id))
+                                            .map(card => ({ ...card, ownerId: 'p1' }));
+
+            const commandersForGame = commanders.map(card => ({ ...card, ownerId: 'p1' }));
 
             const initialGameState = {
                 players: {
@@ -1382,9 +1385,9 @@
                         uid: myUserId,
                         name: playerName,
                         deck: mainDeckForGame,
-                        commander: commanders,
+                        commander: commandersForGame,
                         hand: [], 
-                        battlefield: [], 
+                        battlefield: {},
                         graveyard: [], 
                         exile: [],
                         life: startingLife,

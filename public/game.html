@@ -128,6 +128,36 @@
         gap: 0.5rem;
         align-content: flex-start;
     }
+
+    .battlefield-grid {
+    display: grid;
+    /* This now defines 2 rows and lets the columns auto-fill */
+    grid-template-rows: repeat(2, 1fr);
+    grid-auto-flow: column;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); 
+    gap: 0.5rem;
+    flex-grow: 1;
+    padding-top: 1.5rem;
+    }
+    .grid-slot {
+        border: 2px dashed rgba(255, 255, 255, 0.1);
+        border-radius: 0.5rem;
+        /* Shrink the slot to be just taller than a stacked card */
+        min-height: 170px; 
+        position: relative;
+    }
+    .grid-slot .card {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transition: top 0.2s ease-in-out; /* Add transition for smooth stacking */
+    }
+
+    /* Enables card stacking on the battlefield */
+    .grid-slot .card.stacked {
+        top: 25px; /* Nudge the second card down to create the overlap */
+    }
+
     .context-menu {
         position: fixed;
         z-index: 10000;
@@ -695,16 +725,24 @@
 
                 cardDataMap.clear();
                 Object.values(gameState.players).forEach(player => {
-                    const zones = ['hand', 'battlefield', 'graveyard', 'exile', 'commander', 'deck'];
-                    zones.forEach(zone => {
-                        if (player && player[zone]) {
-                            player[zone].forEach(card => {
-                                if (card && card.instanceId) {
-                                    cardDataMap.set(card.instanceId, card);
-                                }
+                    if (!player) return;
+                    const arrayZones = ['hand', 'graveyard', 'exile', 'commander', 'deck'];
+
+                    // Handle array-based zones first
+                    arrayZones.forEach(zoneKey => {
+                        if (player[zoneKey] && Array.isArray(player[zoneKey])) {
+                            player[zoneKey].forEach(card => {
+                                if (card && card.instanceId) cardDataMap.set(card.instanceId, card);
                             });
                         }
                     });
+
+                    // Handle the object-based battlefield zone separately, looking inside stacks
+                    if (player.battlefield && typeof player.battlefield === 'object') {
+                        Object.values(player.battlefield).flat().forEach(card => { // .flat() is key for handling stacks
+                            if (card && card.instanceId) cardDataMap.set(card.instanceId, card);
+                        });
+                    }
                 });
 
                 const currentPlayerId = gameState.turnOrder[gameState.currentPlayerIndex];
@@ -738,9 +776,29 @@
                         }
                     }
                     
-                    const battlefieldEl = document.getElementById(`${playerId}-battlefield-cards`);
-                    if (battlefieldEl) {
-                        updateCardContainer(battlefieldEl, playerState.battlefield || []);
+                    const battlefieldGridEl = document.getElementById(`${playerId}-battlefield-grid`);
+                    if (battlefieldGridEl) {
+                        // First, clear all cards from the grid slots
+                        battlefieldGridEl.querySelectorAll('.grid-slot').forEach(slot => {
+                            slot.innerHTML = ''; // This will remove ALL cards from the slot
+                        });
+
+                        // Now, place cards from the new data structure into the grid
+                        const battlefieldCards = playerState.battlefield || {};
+                        Object.entries(battlefieldCards).forEach(([slotId, cardArray]) => {
+                            const slot = battlefieldGridEl.querySelector(`[data-slot-id="${slotId}"]`);
+                            if (slot && Array.isArray(cardArray)) {
+                                cardArray.forEach((cardData, index) => {
+                                    if (cardData) {
+                                        const cardEl = createCardElement(cardData);
+                                        if (index > 0) { // If it's not the first card in the slot
+                                            cardEl.classList.add('stacked');
+                                        }
+                                        slot.appendChild(cardEl);
+                                    }
+                                });
+                            }
+                        });
                     }
                     
                     document.getElementById(`${playerId}-graveyard`).querySelector('.zone-title').textContent = `GRAVEYARD (${(playerState.graveyard || []).length})`;
@@ -797,7 +855,7 @@
                             </div>
                             <div id="${playerId}-battlefield-wrapper" class="game-zone flex-grow">
                                 <div class="zone-title">BATTLEFIELD</div>
-                                <div id="${playerId}-battlefield-cards" data-zone-name="battlefield" class="card-container"></div>
+                                <div id="${playerId}-battlefield-grid" data-zone-name="battlefield" class="battlefield-grid"></div>
                             </div>
                             <div class="flex-shrink-0 w-24 md:w-32 flex flex-col items-center justify-between bg-gray-800/80 rounded-lg p-2">
                                 ${isMe ? `
@@ -848,6 +906,19 @@
                 });
                 boardHTML += `</div>`;
                 mainGridEl.innerHTML = boardHTML;
+
+                orderedPlayerIds.forEach(playerId => {
+                    const gridEl = document.getElementById(`${playerId}-battlefield-grid`);
+                    if (gridEl) {
+                        gridEl.innerHTML = ''; // Clear any old content
+                        for (let i = 0; i < 28; i++) {
+                            const slot = document.createElement('div');
+                            slot.className = 'grid-slot';
+                            slot.dataset.slotId = i;
+                            gridEl.appendChild(slot);
+                        }
+                    }
+                });
                 
                 document.querySelectorAll('.clickable-zone').forEach(el => {
                     const playerId = el.id.split('-')[0];
@@ -891,46 +962,64 @@
                 sortableInstances = [];
                 if (!myPlayerId) return;
 
-                // This selector correctly finds all card containers, including those on the battlefield and in the hand.
-                const containers = document.querySelectorAll('.card-container');
+                const options = {
+                    group: 'cards',
+                    animation: 150,
+                    ghostClass: 'sortable-ghost',
+                    dragClass: 'sortable-drag',
+                    onStart: () => document.body.style.cursor = 'grabbing',
+                    onEnd: (event) => {
+                        document.body.style.cursor = '';
+                        handleCardMove(event);
+                    }
+                };
 
-                containers.forEach(containerEl => {
-                    if (!containerEl) return;
+                // Make the hand a draggable area
+                const handEl = document.getElementById('main-player-hand-cards');
+                if (handEl) {
+                    sortableInstances.push(new Sortable(handEl, options));
+                }
 
-                    // Determine if the zone belongs to the current player to enable/disable dragging.
-                    const isMyZone = !!containerEl.closest(`#player-area-${myPlayerId}, #main-player-hand-area`);
+                // Make every grid slot on your battlefield a draggable/droppable area
+                const myBattlefieldGrid = document.getElementById(`${myPlayerId}-battlefield-grid`);
+                if (myBattlefieldGrid) {
+                    myBattlefieldGrid.querySelectorAll('.grid-slot').forEach(slot => {
+                        sortableInstances.push(new Sortable(slot, options));
+                    });
+                }
 
-                    const options = {
-                        group: 'cards',
-                        animation: 150,
-                        ghostClass: 'sortable-ghost',
-                        dragClass: 'sortable-drag',
-                        disabled: !isMyZone, // This prevents you from moving your opponent's cards.
-                        onStart: () => {
-                            if (isMyZone) document.body.style.cursor = 'grabbing';
-                        },
-                        onEnd: (event) => {
-                            if (isMyZone) {
-                                document.body.style.cursor = '';
-                                handleCardMove(event);
-                            }
+                // ADD THIS BLOCK to make the side zones droppable again
+                const sideZoneSelectors = [`#${myPlayerId}-graveyard`, `#${myPlayerId}-exile`, `#${myPlayerId}-commander`];
+                sideZoneSelectors.forEach(selector => {
+                    const zoneEl = document.querySelector(selector);
+                    if (zoneEl) {
+                        const container = zoneEl.querySelector('.card-container');
+                        if (container) {
+                            sortableInstances.push(new Sortable(container, options));
                         }
-                    };
-                    sortableInstances.push(new Sortable(containerEl, options));
+                    }
                 });
             }
             
             function handleCardClick(event) {
-                if (event.metaKey || event.ctrlKey) return; 
+                if (event.metaKey || event.ctrlKey) return;
                 const cardEl = event.currentTarget;
                 const instanceId = cardEl.dataset.instanceId;
                 const playerRef = gameRef.child('players').child(myPlayerId);
 
                 playerRef.transaction(playerState => {
                     if (playerState && playerState.battlefield) {
-                        const cardIndex = playerState.battlefield.findIndex(c => c && c.instanceId === instanceId);
-                        if (cardIndex > -1) {
-                            playerState.battlefield[cardIndex].tapped = !playerState.battlefield[cardIndex].tapped;
+                        // NEW LOGIC: Iterate through the grid object to find the card
+                        for (const slotId in playerState.battlefield) {
+                            const stack = playerState.battlefield[slotId];
+                            if (stack && Array.isArray(stack)) {
+                                const card = stack.find(c => c && c.instanceId === instanceId);
+                                if (card) {
+                                    card.tapped = !card.tapped;
+                                    // Found the card, no need to look further
+                                    return playerState;
+                                }
+                            }
                         }
                     }
                     return playerState;
@@ -1133,13 +1222,18 @@
                 const playerRef = gameRef.child('players').child(myPlayerId);
                 playerRef.transaction(playerState => {
                     if (playerState && playerState.battlefield) {
-                        const card = playerState.battlefield.find(c => c && c.instanceId === contextMenuCard.instanceId);
-                        if (card) {
-                            if (!card.counters) card.counters = {};
-                            if (!card.counters[encodedCounterName]) card.counters[encodedCounterName] = 0;
-                            card.counters[encodedCounterName] += amount;
-                            if (card.counters[encodedCounterName] <= 0) {
-                                delete card.counters[encodedCounterName];
+                        // NEW LOGIC: Iterate through the grid object to find the card
+                        for (const slotId in playerState.battlefield) {
+                            const stack = playerState.battlefield[slotId];
+                            const card = stack ? stack.find(c => c && c.instanceId === contextMenuCard.instanceId) : null;
+                            if (card) {
+                                if (!card.counters) card.counters = {};
+                                if (!card.counters[encodedCounterName]) card.counters[encodedCounterName] = 0;
+                                card.counters[encodedCounterName] += amount;
+                                if (card.counters[encodedCounterName] <= 0) {
+                                    delete card.counters[encodedCounterName];
+                                }
+                                return playerState; // Exit after finding and modifying
                             }
                         }
                     }
@@ -1150,6 +1244,7 @@
             function addNewCounter(counterName) {
                 if (!contextMenuCard) return;
 
+                // --- This is your existing, correct UI update logic ---
                 const countersMenu = document.getElementById('counters-menu');
                 const newCounterNameInput = document.getElementById('new-counter-name');
                 const noCountersMessage = countersMenu.querySelector('.text-gray-400');
@@ -1176,15 +1271,23 @@
                 }
 
                 newCounterNameInput.value = ''; // Clear the input box
+                // --- End of UI logic ---
 
+
+                // --- This is the new, corrected database logic ---
                 const encodedName = encodeFirebaseKey(counterName);
                 const playerRef = gameRef.child('players').child(myPlayerId);
                 playerRef.transaction(playerState => {
                     if (playerState && playerState.battlefield) {
-                        const card = playerState.battlefield.find(c => c.instanceId === contextMenuCard.instanceId);
-                        if (card) {
-                            if (!card.counters) card.counters = {};
-                            card.counters[encodedName] = (card.counters[encodedName] || 0) + 1;
+                        // NEW LOGIC: Iterate through the grid object to find the card
+                        for (const slotId in playerState.battlefield) {
+                            const stack = playerState.battlefield[slotId];
+                            const card = stack ? stack.find(c => c && c.instanceId === contextMenuCard.instanceId) : null;
+                            if (card) {
+                                if (!card.counters) card.counters = {};
+                                card.counters[encodedName] = (card.counters[encodedName] || 0) + 1;
+                                return playerState; // Exit after finding and modifying
+                            }
                         }
                     }
                     return playerState;
@@ -1194,33 +1297,69 @@
             function moveCardToZone(toZoneId) {
                 if (!contextMenuCard) return;
                 const { instanceId, fromZone } = contextMenuCard;
-                
+
                 const isLibraryMove = toZoneId.includes('library');
                 const toZone = isLibraryMove ? 'deck' : toZoneId.replace('-top','').replace('-bottom','');
 
                 const playerRef = gameRef.child('players').child(myPlayerId);
                 playerRef.transaction(playerState => {
-                    if (!playerState || !playerState[fromZone]) return playerState;
+                    if (!playerState) return playerState;
 
-                    const cardIndex = playerState[fromZone].findIndex(c => c && c.instanceId === instanceId);
-                    if (cardIndex > -1) {
-                        const [cardToMove] = playerState[fromZone].splice(cardIndex, 1);
-                        
+                    let cardToMove = null;
+
+                    // --- FIND AND REMOVE THE CARD ---
+                    if (fromZone === 'battlefield') {
+                        if (playerState.battlefield) {
+                            for (const slotId in playerState.battlefield) {
+                                const stack = playerState.battlefield[slotId];
+                                const cardIndex = stack.findIndex(c => c && c.instanceId === instanceId);
+                                if (cardIndex > -1) {
+                                    [cardToMove] = stack.splice(cardIndex, 1);
+                                    if (stack.length === 0) {
+                                        delete playerState.battlefield[slotId];
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    } else { // From hand, graveyard, etc.
+                        if (playerState[fromZone] && Array.isArray(playerState[fromZone])) {
+                            const cardIndex = playerState[fromZone].findIndex(c => c && c.instanceId === instanceId);
+                            if (cardIndex > -1) {
+                                [cardToMove] = playerState[fromZone].splice(cardIndex, 1);
+                            }
+                        }
+                    }
+
+                    if (cardToMove) {
                         if (toZone !== 'battlefield') {
-                           delete cardToMove.tapped;
-                           delete cardToMove.counters;
+                            delete cardToMove.tapped;
+                            delete cardToMove.counters;
                         }
 
-                        if (!playerState[toZone]) playerState[toZone] = [];
-                        
-                        if (isLibraryMove) {
-                           if (toZoneId.endsWith('-top')) {
+                        // --- PLACE THE CARD IN ITS DESTINATION ---
+                        if (toZone === 'battlefield') {
+                            if (!playerState.battlefield) playerState.battlefield = {};
+                            let placed = false;
+                            for (let i = 0; i < 20; i++) {
+                                if (!playerState.battlefield[i] || playerState.battlefield[i].length === 0) {
+                                    playerState.battlefield[i] = [cardToMove];
+                                    placed = true;
+                                    break;
+                                }
+                            }
+                            if (!placed) {
+                                if (!playerState.hand) playerState.hand = [];
+                                playerState.hand.push(cardToMove);
+                            }
+                        } else { // Moving to a non-battlefield zone
+                            if (!playerState[toZone]) playerState[toZone] = [];
+                            if (isLibraryMove) {
+                                if (toZoneId.endsWith('-top')) playerState[toZone].push(cardToMove);
+                                else playerState[toZone].unshift(cardToMove);
+                            } else {
                                 playerState[toZone].push(cardToMove);
-                           } else {
-                                playerState[toZone].unshift(cardToMove);
-                           }
-                        } else {
-                            playerState[toZone].push(cardToMove);
+                            }
                         }
                     }
                     return playerState;
@@ -1358,46 +1497,66 @@
                 const instanceId = cardEl.dataset.instanceId;
                 if (!instanceId) return;
 
-                const fromEl = event.from;
-                const toEl = event.to;
+                const fromZoneEl = event.from.closest('[data-zone-name]');
+                const toZoneEl = event.to.closest('[data-zone-name]');
 
-                const fromKey = fromEl.closest('[data-zone-name]').dataset.zoneName;
-                const toKey = toEl.closest('[data-zone-name]').dataset.zoneName;
-                
-                if (!fromKey || !toKey) {
-                    console.error("Could not determine from/to zone for card move.", { fromEl, toEl });
+                if (!fromZoneEl || !toZoneEl) {
+                    console.error("Could not determine from/to zone for card move.");
                     return;
                 }
-                
+
+                const fromKey = fromZoneEl.dataset.zoneName;
+                const toKey = toZoneEl.dataset.zoneName;
+                const fromSlotEl = event.from.closest('.grid-slot');
+                const toSlotEl = event.to.closest('.grid-slot');
+
                 const playerRef = gameRef.child('players').child(myPlayerId);
                 playerRef.transaction(playerState => {
                     if (!playerState) return playerState;
-
                     let cardToMove = null;
-                    const potentialZones = ['hand', 'battlefield', 'graveyard', 'exile', 'commander', 'deck'];
-                    
-                    for (const zoneKey of potentialZones) {
-                         const actualZoneKey = zoneKey === 'library' ? 'deck' : zoneKey;
-                        if (playerState[actualZoneKey]) {
-                            const cardIndex = playerState[actualZoneKey].findIndex(c => c && c.instanceId === instanceId);
+
+                    // Find and remove the card from its original location
+                    if (fromKey === 'battlefield' && fromSlotEl) {
+                        const fromSlotId = fromSlotEl.dataset.slotId;
+                        if (playerState.battlefield && playerState.battlefield[fromSlotId]) {
+                            const cardIndex = playerState.battlefield[fromSlotId].findIndex(c => c && c.instanceId === instanceId);
                             if (cardIndex > -1) {
-                                [cardToMove] = playerState[actualZoneKey].splice(cardIndex, 1);
-                                break;
+                                [cardToMove] = playerState.battlefield[fromSlotId].splice(cardIndex, 1);
+                                // If the slot is now empty, remove the array
+                                if (playerState.battlefield[fromSlotId].length === 0) {
+                                    delete playerState.battlefield[fromSlotId];
+                                }
+                            }
+                        }
+                    } else { // From hand, graveyard, etc.
+                        if (playerState[fromKey] && Array.isArray(playerState[fromKey])) {
+                            const cardIndex = playerState[fromKey].findIndex(c => c && c.instanceId === instanceId);
+                            if (cardIndex > -1) {
+                                [cardToMove] = playerState[fromKey].splice(cardIndex, 1);
                             }
                         }
                     }
-                    
+
                     if (cardToMove) {
-                        const actualToKey = toKey === 'library' ? 'deck' : toKey;
-                        if (!playerState[actualToKey]) playerState[actualToKey] = [];
-                        
-                        if (actualToKey !== 'battlefield') {
-                            delete cardToMove.tapped;
-                            delete cardToMove.counters;
+                        // Now, place the card in its new location
+                        if (toKey === 'battlefield' && toSlotEl) {
+                            const toSlotId = toSlotEl.dataset.slotId;
+                            if (!playerState.battlefield) playerState.battlefield = {};
+                            if (!playerState.battlefield[toSlotId]) playerState.battlefield[toSlotId] = [];
+
+                            // Check if the slot can accept another card (max of 2)
+                            if (playerState.battlefield[toSlotId].length < 2) {
+                                playerState.battlefield[toSlotId].push(cardToMove);
+                            } else {
+                                // Slot is full, return the card to the hand as a fallback
+                                if (!playerState.hand) playerState.hand = [];
+                                playerState.hand.push(cardToMove);
+                            }
+                        } else { // Moving to a non-battlefield zone (hand, graveyard, etc.)
+                            if (!playerState[toKey]) playerState[toKey] = [];
+                            playerState[toKey].push(cardToMove);
                         }
-                        
-                        playerState[actualToKey].splice(event.newIndex, 0, cardToMove);
-                    } 
+                    }
                     return playerState;
                 });
             }
@@ -1521,10 +1680,12 @@
                 deck.forEach(card => {
                 // Assign a unique instanceId to each card in the deck
                     card.instanceId = `card-${Date.now()}-${Math.random()}`;
+                    card.ownerId = myPlayerId; 
             });
 
                 commanders.forEach(c => {
                     if (!c.instanceId) c.instanceId = `card-${Date.now()}-${Math.random()}`;
+                    c.ownerId = myPlayerId;
                 });
                 gameRef.child('players').child(myPlayerId).update({
                     name: playerName,
@@ -1539,14 +1700,28 @@
                 const playerRef = gameRef.child('players').child(myPlayerId);
                 playerRef.transaction(playerState => {
                     if (playerState) {
-                        if (!playerState.battlefield) playerState.battlefield = [];
-                        
+                        if (!playerState.battlefield) playerState.battlefield = {}; // Ensure battlefield is an object
+
                         const newToken = {
                             ...tokenData,
                             isToken: true,
                             instanceId: `token-${Date.now()}-${Math.random()}`
                         };
-                        playerState.battlefield.push(newToken);
+
+                        // Find the first available empty slot in the grid
+                        let placed = false;
+                        for (let i = 0; i < 20; i++) { // Check up to 20 slots
+                            if (!playerState.battlefield[i] || playerState.battlefield[i].length === 0) {
+                                playerState.battlefield[i] = [newToken]; // Place it in a new stack
+                                placed = true;
+                                break;
+                            }
+                        }
+
+                        if (!placed) {
+                            // Fallback in case the board is full
+                            alert("Battlefield is full, cannot create token.");
+                        }
                     }
                     return playerState;
                 });
@@ -1839,9 +2014,14 @@
                 const playerRef = gameRef.child('players').child(myPlayerId);
                 playerRef.transaction(playerState => {
                     if (playerState && playerState.battlefield) {
-                        playerState.battlefield.forEach(card => {
-                            if (card) {
-                                card.tapped = false;
+                        // NEW LOGIC: Iterate through the grid object and the stacks
+                        Object.values(playerState.battlefield).forEach(stack => {
+                            if (Array.isArray(stack)) {
+                                stack.forEach(card => {
+                                    if (card) {
+                                        card.tapped = false;
+                                    }
+                                });
                             }
                         });
                     }
@@ -2115,7 +2295,7 @@
                                             
                                             currentGameState.players[openSlot] = { 
                                                 uid: myUserId, name: pendingData.playerName, life: startingLife, 
-                                                deck: deck, hand: [], battlefield: [], graveyard:[], exile:[], 
+                                                deck: deck, hand: [], battlefield: {}, graveyard:[], exile:[], 
                                                 commander: pendingData.commanders, deckLoaded: true 
                                             };
                                             localStorage.removeItem('pendingJoinData');
