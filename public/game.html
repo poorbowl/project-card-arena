@@ -557,6 +557,7 @@
             let longPressTimer;
             let allCardsFromDb = [];
             let cardDataMap = new Map();
+            let resizeTimeout; 
             let interactiveActionState = {
                 active: false,
                 mode: null,
@@ -833,6 +834,27 @@
                 addCardEventListeners();
             }
 
+            // Calculate Battlefield grid slots
+            function calculateAndCreateSlots(gridEl) {
+                if (!gridEl) return;
+
+                const slotWidth = 110; // The minimum width of a card slot
+                const gap = 8; // The space between slots (0.5rem)
+                const gridWidth = gridEl.offsetWidth;
+
+                // Calculate how many columns can fit in the available width
+                const numCols = Math.floor(gridWidth / (slotWidth + gap));
+                const totalSlots = numCols * 2; // We want two rows
+
+                gridEl.innerHTML = ''; // Clear any old slots
+                for (let i = 0; i < totalSlots; i++) {
+                    const slot = document.createElement('div');
+                    slot.className = 'grid-slot';
+                    slot.dataset.slotId = i + 1; // Start labeling from 1 instead of 0
+                    gridEl.appendChild(slot);
+                }
+            }
+
             function setupBoardHTML(orderedPlayerIds) {
                  const playerCount = orderedPlayerIds.length;
                 let gridWrapperClass = 'w-full h-full grid gap-2';
@@ -915,18 +937,15 @@
                 boardHTML += `</div>`;
                 mainGridEl.innerHTML = boardHTML;
 
-                orderedPlayerIds.forEach(playerId => {
-                    const gridEl = document.getElementById(`${playerId}-battlefield-grid`);
-                    if (gridEl) {
-                        gridEl.innerHTML = ''; // Clear any old content
-                        for (let i = 0; i < 28; i++) {
-                            const slot = document.createElement('div');
-                            slot.className = 'grid-slot';
-                            slot.dataset.slotId = i;
-                            gridEl.appendChild(slot);
-                        }
-                    }
-                });
+                // Use a timeout to ensure the grid has been rendered before we measure it
+                setTimeout(() => {
+                    orderedPlayerIds.forEach(playerId => {
+                        const gridEl = document.getElementById(`${playerId}-battlefield-grid`);
+                        calculateAndCreateSlots(gridEl);
+                    });
+                    // After creating the correct number of slots, we need to re-render to place any existing cards.
+                    renderBoard();
+                }, 100); // A 100ms delay gives the browser time to render
                 
                 document.querySelectorAll('.clickable-zone').forEach(el => {
                     const playerId = el.id.split('-')[0];
@@ -2158,6 +2177,31 @@
                 document.body.dataset.chatState = 'closed';
             });
             chatInputEl.addEventListener('keydown', handleSendMessage);
+
+            // ADD THIS BLOCK FOR INITIAL CALCULATION
+            setTimeout(() => {
+                if (gameState && gameState.players) {
+                    Object.keys(gameState.players).forEach(playerId => {
+                        const gridEl = document.getElementById(`${playerId}-battlefield-grid`);
+                        calculateAndCreateSlots(gridEl);
+                    });
+                    renderBoard();
+                }
+            }, 100); // A 100ms delay gives the browser time to render
+
+            // ADD THIS BLOCK FOR RESIZING
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    if (gameState && gameState.players) {
+                        Object.keys(gameState.players).forEach(playerId => {
+                            const gridEl = document.getElementById(`${playerId}-battlefield-grid`);
+                            calculateAndCreateSlots(gridEl);
+                        });
+                        renderBoard();
+                    }
+                }, 250);
+            });
 
             untapAllBtn.addEventListener('click', handleUntapAll);
 
