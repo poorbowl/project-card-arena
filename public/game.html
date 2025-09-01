@@ -1515,14 +1515,13 @@
                     if (!playerState) return playerState;
                     let cardToMove = null;
 
-                    // Find and remove the card from its original location
+                    // --- FIND AND REMOVE THE CARD ---
                     if (fromKey === 'battlefield' && fromSlotEl) {
                         const fromSlotId = fromSlotEl.dataset.slotId;
                         if (playerState.battlefield && playerState.battlefield[fromSlotId]) {
                             const cardIndex = playerState.battlefield[fromSlotId].findIndex(c => c && c.instanceId === instanceId);
                             if (cardIndex > -1) {
                                 [cardToMove] = playerState.battlefield[fromSlotId].splice(cardIndex, 1);
-                                // If the slot is now empty, remove the array
                                 if (playerState.battlefield[fromSlotId].length === 0) {
                                     delete playerState.battlefield[fromSlotId];
                                 }
@@ -1538,23 +1537,26 @@
                     }
 
                     if (cardToMove) {
-                        // Now, place the card in its new location
+                        // --- PLACE THE CARD IN ITS DESTINATION ---
                         if (toKey === 'battlefield' && toSlotEl) {
                             const toSlotId = toSlotEl.dataset.slotId;
                             if (!playerState.battlefield) playerState.battlefield = {};
                             if (!playerState.battlefield[toSlotId]) playerState.battlefield[toSlotId] = [];
 
-                            // Check if the slot can accept another card (max of 2)
                             if (playerState.battlefield[toSlotId].length < 2) {
                                 playerState.battlefield[toSlotId].push(cardToMove);
                             } else {
-                                // Slot is full, return the card to the hand as a fallback
                                 if (!playerState.hand) playerState.hand = [];
                                 playerState.hand.push(cardToMove);
                             }
                         } else { // Moving to a non-battlefield zone (hand, graveyard, etc.)
                             if (!playerState[toKey]) playerState[toKey] = [];
-                            playerState[toKey].push(cardToMove);
+                            // This is the key fix: handle reordering within the hand
+                            if (fromKey === 'hand' && toKey === 'hand') {
+                                playerState.hand.splice(event.newIndex, 0, cardToMove);
+                            } else {
+                                playerState[toKey].push(cardToMove);
+                            }
                         }
                     }
                     return playerState;
