@@ -1890,6 +1890,11 @@
                     wrapper.dataset.instanceId = card.instanceId;
 
                     const cardEl = createCardElement(card);
+
+                    cardEl.addEventListener('mouseenter', (e) => handleCardMouseOver(e));
+                    cardEl.addEventListener('mouseleave', handleCardMouseOut);
+                    cardEl.addEventListener('mousemove', handleCardMouseMove);
+
                     wrapper.appendChild(cardEl);
 
                     const buttonContainer = document.createElement('div');
