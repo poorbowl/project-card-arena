@@ -140,11 +140,19 @@
     padding-top: 1.5rem;
     }
     .grid-slot {
-        border: 2px dashed rgba(255, 255, 255, 0.1);
-        border-radius: 0.5rem;
-        /* Shrink the slot to be just taller than a stacked card */
-        min-height: 170px; 
-        position: relative;
+    border: 2px dashed rgba(255, 255, 255, 0.1);
+    border-radius: 0.5rem;
+    height: 170px; /* This sets a FIXED height to prevent vertical stretching */
+    position: relative;
+    }
+    /* This new rule adds the slot number label */
+    .grid-slot::before {
+        content: attr(data-slot-id);
+        position: absolute;
+        top: 4px;
+        left: 6px;
+        font-size: 0.75rem;
+        color: rgba(255, 255, 255, 0.2);
     }
     .grid-slot .card {
     position: absolute;
