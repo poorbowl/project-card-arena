@@ -1764,7 +1764,7 @@
 
                         // Find the first available empty slot in the grid
                         let placed = false;
-                        for (let i = 0; i < 20; i++) { // Check up to 20 slots
+                        for (let i = 0; i < 40; i++) { // Check up to 40 slots
                             if (!playerState.battlefield[i] || playerState.battlefield[i].length === 0) {
                                 playerState.battlefield[i] = [newToken]; // Place it in a new stack
                                 placed = true;
@@ -1773,8 +1773,8 @@
                         }
 
                         if (!placed) {
-                            // Fallback in case the board is full
-                            alert("Battlefield is full, cannot create token.");
+                            // This is a fallback in case the board is somehow full
+                            console.error("Battlefield is full, cannot create token.");
                         }
                     }
                     return playerState;
@@ -1788,9 +1788,19 @@
                 const playerRef = gameRef.child('players').child(myPlayerId);
                 playerRef.transaction(playerState => {
                     if (playerState && playerState.battlefield) {
-                        const cardIndex = playerState.battlefield.findIndex(c => c && c.instanceId === instanceId);
-                        if (cardIndex > -1) {
-                            playerState.battlefield.splice(cardIndex, 1);
+                        // NEW LOGIC: Iterate through the grid object to find the token
+                        for (const slotId in playerState.battlefield) {
+                            const stack = playerState.battlefield[slotId];
+                            if (stack && Array.isArray(stack)) {
+                                const cardIndex = stack.findIndex(c => c && c.instanceId === instanceId);
+                                if (cardIndex > -1) {
+                                    stack.splice(cardIndex, 1);
+                                    if (stack.length === 0) {
+                                        delete playerState.battlefield[slotId];
+                                    }
+                                    return playerState; // Exit after finding and deleting
+                                }
+                            }
                         }
                     }
                     return playerState;
