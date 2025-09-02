@@ -1426,7 +1426,7 @@
 
         const handleJoinGame = () => {
             hideMessage();
-            const gameId = joinGameIdInput.value.trim();
+            let gameIdInput = joinGameIdInput.value.trim();
             const playerName = document.getElementById('playerName').value.trim();
 
             if (currentDeck.length === 0) {
@@ -1437,10 +1437,24 @@
                 showMessage("Please enter your name before joining.", true);
                 return;
             }
-            if (!gameId) {
-                showMessage("Please enter a Game ID to join.", true);
+            if (!gameIdInput) {
+                showMessage("Please enter a Game ID or URL to join.", true);
                 return;
             }
+
+            // --- NEW LOGIC TO PARSE URL ---
+            let gameId = gameIdInput;
+            try {
+                // Check if the input is a full URL
+                if (gameIdInput.includes('?gameId=')) {
+                    const url = new URL(gameIdInput);
+                    gameId = url.searchParams.get('gameId');
+                }
+            } catch (error) {
+                console.error("Invalid URL provided, treating as Game ID.", error);
+                // If URL parsing fails, we'll just use the input as-is.
+            }
+            // --- END OF NEW LOGIC ---
 
             const mainDeckForGame = currentDeck.filter(card => !commanders.some(c => c.id === card.id));
 
