@@ -506,6 +506,18 @@
         </div>
     </div>
 
+    <div id="opening-hand-modal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+        <div class="bg-gray-800 rounded-lg max-w-md w-full p-6 shadow-2xl border border-indigo-500">
+            <h2 class="text-2xl font-bold mb-4 text-indigo-300">Opening Hand</h2>
+            <p id="opening-hand-message" class="text-gray-300 mb-6">Your opening hand contains X lands.</p>
+            <div class="flex flex-col gap-3">
+                <button id="keep-hand-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">Keep Hand</button>
+                <button id="mulligan-btn" class="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg">Mulligan (Shuffle)</button>
+                <button id="opening-hand-cancel-btn" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <div id="card-popout" class="hidden fixed rounded-lg shadow-2xl pointer-events-none p-2 space-y-2">
         <div class="flex justify-between items-start">
             <span id="popout-name" class="font-bold"></span>
@@ -557,7 +569,8 @@
             let longPressTimer;
             let allCardsFromDb = [];
             let cardDataMap = new Map();
-            let resizeTimeout; 
+            let resizeTimeout;
+            let pendingOpeningHand = [];
             let interactiveActionState = {
                 active: false,
                 mode: null,
@@ -613,6 +626,10 @@
             const chatInputEl = document.getElementById('chat-input');
 
             const untapAllBtn = document.getElementById('untapAllBtn');
+
+            const keepHandBtn = document.getElementById('keep-hand-btn');
+            const mulliganBtn = document.getElementById('mulligan-btn');
+            const openingHandCancelBtn = document.getElementById('opening-hand-cancel-btn');
 
             const encodeFirebaseKey = (str) => str.replace(/\//g, '__slash__');
             const decodeFirebaseKey = (str) => str.replace(/__slash__/g, '/');
@@ -1662,6 +1679,14 @@
                 finishInteractiveBtn.classList.add('hidden');
                 interactiveActionState.active = false;
             }
+
+            function closeOpeningHandModal() {
+                const modal = document.getElementById('opening-hand-modal');
+                if (modal) {
+                    modal.classList.add('hidden');
+                }
+                pendingOpeningHand = []; // Clear the temporary hand
+            }
             
             function showDeckSelectionModal() {
                 const savedDecks = JSON.parse(localStorage.getItem('savedDecks')) || {};
@@ -1810,7 +1835,7 @@
 
             function handleShuffleLibrary() {
                 const playerRef = gameRef.child('players').child(myPlayerId);
-                playerRef.transaction(playerState => {
+                return playerRef.transaction(playerState => {
                     if (playerState && playerState.deck) {
                         shuffle(playerState.deck);
                     }
@@ -1839,34 +1864,48 @@
             }
 
             const handleDrawOpeningHand = () => {
-                const playerRef = gameRef.child('players').child(myPlayerId);
+                const playerState = gameState.players[myPlayerId];
 
-                playerRef.transaction(playerState => {
-                    if (playerState && playerState.deck && playerState.deck.length >= 7) {
-                        // Peek at the top 7 cards without removing them yet
-                        const openingHand = playerState.deck.slice(-7);
-
-                        // Count the lands
-                        const landCount = openingHand.filter(card => card && card.type && card.type.includes('Land')).length;
-
-                        // Use a confirm dialog to ask the player
-                        if (confirm(`Your opening hand has ${landCount} lands. Keep this hand?`)) {
-                            // Player keeps the hand: move the cards from deck to hand
-                            playerState.deck.splice(-7, 7); // Remove top 7 from deck
-                            if (!playerState.hand) playerState.hand = [];
-                            playerState.hand.push(...openingHand);
-                        } else {
-                            // Player mulligans: just shuffle the deck. The cards are not moved.
-                            shuffle(playerState.deck);
-                        }
-                    } else {
-                        // Not enough cards to draw a hand
-                        alert("You need at least 7 cards in your library to draw an opening hand.");
-                    }
-                    return playerState; // Return the modified (or unmodified) state
-                });
+                if (playerState && playerState.deck && playerState.deck.length >= 7) {
+                    const openingHand = playerState.deck.slice(-7);
+                    const landCount = openingHand.filter(card => card && card.type && card.type.includes('Land')).length;
+                    showOpeningHandModal(landCount, openingHand);
+                } else {
+                    alert("You need at least 7 cards in your library to draw an opening hand.");
+                }
             };
 
+            // Draw opening hand modal functions
+            function showOpeningHandModal(landCount, hand) {
+                pendingOpeningHand = hand; // Store the hand globally
+                const modal = document.getElementById('opening-hand-modal');
+                const messageEl = document.getElementById('opening-hand-message');
+                messageEl.textContent = `Your opening hand contains ${landCount} lands.`;
+                modal.classList.remove('hidden');
+            }
+
+            function handleKeepHand() {
+                const playerRef = gameRef.child('players').child(myPlayerId);
+                playerRef.transaction(playerState => {
+                    if (playerState && playerState.deck && playerState.deck.length >= 7) {
+                        playerState.deck.splice(-7, 7); // Remove top 7 from deck
+                        if (!playerState.hand) playerState.hand = [];
+                        playerState.hand.push(...pendingOpeningHand);
+                    }
+                    return playerState;
+                });
+                closeOpeningHandModal();
+            }
+
+            async function handleMulligan() {
+                // First, tell the library to shuffle and wait for it to finish.
+                await handleShuffleLibrary();
+
+                // The game state will update automatically after the shuffle.
+                // Now, re-run the draw hand logic to show the new top 7 cards.
+                handleDrawOpeningHand();
+            }
+            
             function openInteractiveZoneViewer(mode, count) {
                 const playerState = gameState.players[myPlayerId];
                 const deck = playerState.deck || [];
@@ -2209,6 +2248,11 @@
             });
 
             untapAllBtn.addEventListener('click', handleUntapAll);
+
+            // Draw opening hand event listeners
+            keepHandBtn.addEventListener('click', handleKeepHand);
+            mulliganBtn.addEventListener('click', handleMulligan);
+            openingHandCancelBtn.addEventListener('click', closeOpeningHandModal);
 
             // Token Creator Logic
             const tokenCreateBtn = document.getElementById('token-creator-create');
