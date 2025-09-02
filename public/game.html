@@ -1397,12 +1397,30 @@
                                 playerState.hand.push(cardToMove);
                             }
                         } else { // Moving to a non-battlefield zone
-                            if (!playerState[toZone]) playerState[toZone] = [];
-                            if (isLibraryMove) {
-                                if (toZoneId.endsWith('-top')) playerState[toZone].push(cardToMove);
-                                else playerState[toZone].unshift(cardToMove);
+                            if (toZone === 'battlefield') {
+                                if (!playerState.battlefield) playerState.battlefield = {};
+                                // Find the first empty slot to place the card in
+                                let placed = false;
+                                for (let i = 0; i < 40; i++) { // Check up to 40 slots
+                                    if (!playerState.battlefield[i] || playerState.battlefield[i].length === 0) {
+                                        playerState.battlefield[i] = [cardToMove]; // Place it in a new stack
+                                        placed = true;
+                                        break;
+                                    }
+                                }
+                                if (!placed) { // Fallback if no empty slots, return to hand
+                                    if (!playerState.hand) playerState.hand = [];
+                                    playerState.hand.push(cardToMove);
+                                }
                             } else {
-                                playerState[toZone].push(cardToMove);
+                                // This is the original logic for all other zones
+                                if (!playerState[toZone]) playerState[toZone] = [];
+                                if (isLibraryMove) {
+                                    if (toZoneId.endsWith('-top')) playerState[toZone].push(cardToMove);
+                                    else playerState[toZone].unshift(cardToMove);
+                                } else {
+                                    playerState[toZone].push(cardToMove);
+                                }
                             }
                         }
                     }
