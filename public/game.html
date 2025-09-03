@@ -404,6 +404,46 @@
     .game-zone[data-click-type="both"] {
         border-color: rgba(16, 185, 129, 0.5); /* Green for "Both" */
     }
+    .title-container {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem; /* 12px */
+        }
+        .info-icon {
+            display: inline-block;
+            position: relative;
+            cursor: pointer;
+            width: 20px;
+            height: 20px;
+            border-radius: 9999px;
+            background-color: #4b5563; /* bg-gray-600 */
+            color: white;
+            text-align: center;
+            font-weight: bold;
+            line-height: 20px;
+            font-size: 14px;
+        }
+        .tooltip-text {
+            visibility: hidden;
+            width: 220px;
+            background-color: #1f2937; /* bg-gray-800 */
+            color: #fff;
+            text-align: center;
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid #4f46e5; /* border-indigo-500 */
+            position: absolute;
+            z-index: 100; /* Increased z-index to ensure it's on top of other modal content */
+            top: 125%; /* Changed from 'bottom' to 'top' to appear below */
+            left: 50%; /* Center horizontally */
+            transform: translateX(-50%); /* Fine-tune centering */
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .info-icon:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
 
 </style>
 </head>
@@ -448,8 +488,13 @@
     <div id="zone-viewer-modal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
         <div class="bg-gray-800 rounded-lg max-w-6xl w-full max-h-full overflow-y-auto p-6 relative shadow-2xl border border-indigo-500">
             <div class="flex justify-between items-center mb-4">
-                 <h2 id="zone-viewer-title" class="text-2xl font-bold text-indigo-300">Zone</h2>
-                 <button id="finish-interactive-btn" class="hidden bg-green-600 text-white font-bold py-2 px-4 rounded-lg">Finish</button>
+                                <div class="title-container">
+                    <h2 id="zone-viewer-title" class="text-2xl font-bold text-indigo-300">Zone</h2>
+                    <div id="commander-info-icon" class="info-icon" style="display: none;">i
+                        <span class="tooltip-text">Right-click a commander card to change its cast count.</span>
+                    </div>
+                </div>
+                                <button id="finish-interactive-btn" class="hidden bg-green-600 text-white font-bold py-2 px-4 rounded-lg">Finish</button>
             </div>
             <button id="zone-viewer-close" class="absolute top-4 right-4 text-3xl font-light text-gray-400 hover:text-white leading-none">&times;</button>
             <div id="zone-viewer-content" data-zone-name="" class="card-container min-h-[150px] justify-center">
@@ -1674,11 +1719,21 @@
             }
             
             function openZoneViewer(playerId, zoneName, cardsToShow = null) {
-                 if (modalSortable) modalSortable.destroy();
+                if (modalSortable) modalSortable.destroy();
+
+                // Get a reference to the new info icon at the start
+                const infoIcon = document.getElementById('commander-info-icon');
 
                 const playerState = gameState.players[playerId];
                 if (!playerState) return;
                 
+                // Show or hide the icon based on the zone
+                if (zoneName === 'commander' && playerId === myPlayerId) {
+                    infoIcon.style.display = 'inline-block';
+                } else {
+                    infoIcon.style.display = 'none';
+                }
+
                 const actualZoneName = zoneName === 'library' ? 'deck' : zoneName;
                 const cards = cardsToShow !== null ? cardsToShow : (playerState[actualZoneName] || []);
 
@@ -1692,9 +1747,9 @@
                 if (cards.length === 0) {
                     zoneViewerContent.innerHTML = '<p class="text-gray-500">This zone is empty.</p>';
                 } else {
-                     cards.slice().reverse().forEach(card => {
-                         const cardEl = createCardElement(card);
-                         zoneViewerContent.appendChild(cardEl);
+                    cards.slice().reverse().forEach(card => {
+                        const cardEl = createCardElement(card);
+                        zoneViewerContent.appendChild(cardEl);
                     });
                 }
                 
@@ -1709,6 +1764,7 @@
                         ghostClass: 'sortable-ghost',
                         dragClass: 'sortable-drag',
                         onStart: () => document.body.style.cursor = 'grabbing',
+                        // The original, correct logic is restored here
                         onEnd: (event) => {
                             document.body.style.cursor = '';
                             handleCardMove(event);
