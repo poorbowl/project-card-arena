@@ -1376,7 +1376,8 @@
                     }
 
                     if (cardToMove) {
-                        if (toZone !== 'battlefield') {
+                        // If the card is leaving the battlefield, clear its state
+                        if (fromZone === 'battlefield' && toZone !== 'battlefield') {
                             delete cardToMove.tapped;
                             delete cardToMove.counters;
                         }
@@ -1385,42 +1386,26 @@
                         if (toZone === 'battlefield') {
                             if (!playerState.battlefield) playerState.battlefield = {};
                             let placed = false;
-                            for (let i = 0; i < 20; i++) {
+                            // CORRECTED LOOP: Start at 1 to match data-slot-id
+                            for (let i = 1; i <= 40; i++) {
                                 if (!playerState.battlefield[i] || playerState.battlefield[i].length === 0) {
                                     playerState.battlefield[i] = [cardToMove];
                                     placed = true;
                                     break;
                                 }
                             }
+                            // Fallback if battlefield is full
                             if (!placed) {
                                 if (!playerState.hand) playerState.hand = [];
                                 playerState.hand.push(cardToMove);
                             }
                         } else { // Moving to a non-battlefield zone
-                            if (toZone === 'battlefield') {
-                                if (!playerState.battlefield) playerState.battlefield = {};
-                                // Find the first empty slot to place the card in
-                                let placed = false;
-                                for (let i = 0; i < 40; i++) { // Check up to 40 slots
-                                    if (!playerState.battlefield[i] || playerState.battlefield[i].length === 0) {
-                                        playerState.battlefield[i] = [cardToMove]; // Place it in a new stack
-                                        placed = true;
-                                        break;
-                                    }
-                                }
-                                if (!placed) { // Fallback if no empty slots, return to hand
-                                    if (!playerState.hand) playerState.hand = [];
-                                    playerState.hand.push(cardToMove);
-                                }
+                            if (!playerState[toZone]) playerState[toZone] = [];
+                            if (isLibraryMove) {
+                                if (toZoneId.endsWith('-top')) playerState[toZone].push(cardToMove);
+                                else playerState[toZone].unshift(cardToMove);
                             } else {
-                                // This is the original logic for all other zones
-                                if (!playerState[toZone]) playerState[toZone] = [];
-                                if (isLibraryMove) {
-                                    if (toZoneId.endsWith('-top')) playerState[toZone].push(cardToMove);
-                                    else playerState[toZone].unshift(cardToMove);
-                                } else {
-                                    playerState[toZone].push(cardToMove);
-                                }
+                                playerState[toZone].push(cardToMove);
                             }
                         }
                     }
@@ -1782,7 +1767,7 @@
 
                         // Find the first available empty slot in the grid
                         let placed = false;
-                        for (let i = 0; i < 40; i++) { // Check up to 40 slots
+                        for (let i = 1; i < 40; i++) { // Check up to 40 slots
                             if (!playerState.battlefield[i] || playerState.battlefield[i].length === 0) {
                                 playerState.battlefield[i] = [newToken]; // Place it in a new stack
                                 placed = true;
