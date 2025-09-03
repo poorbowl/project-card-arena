@@ -395,14 +395,29 @@
         animation: roll-animation 0.5s ease-in-out;
     }
 
+    .game-zone[data-click-type="left"] {
+        border-color: rgba(59, 130, 246, 0.5); /* Blue for "View" */
+    }
+    .game-zone[data-click-type="right"] {
+        border-color: rgba(234, 179, 8, 0.5); /* Yellow for "Menu" */
+    }
+    .game-zone[data-click-type="both"] {
+        border-color: rgba(16, 185, 129, 0.5); /* Green for "Both" */
+    }
+
 </style>
 </head>
 <body data-chat-state="closed" class="text-white">
 
     <header class="flex-shrink-0 bg-gray-800 p-2 flex justify-between items-center shadow-md">
-         <div class="text-xs">Game ID: <span id="gameIdDisplay" class="font-mono bg-gray-700 px-2 py-1 rounded"></span></div>
+        <div class="text-xs">Game ID: <span id="gameIdDisplay" class="font-mono bg-gray-700 px-2 py-1 rounded"></span></div>
 
-        <div class="flex items-center gap-4">
+        <div class="hidden md:flex items-center text-xs space-x-4 text-gray-400">
+            <span><b class="text-blue-400">■ Blue:</b> Left-Click to View</span>
+            <span><b class="text-yellow-400">■ Yellow:</b> Right-Click for Menu</span>
+            <span><b class="text-green-400">■ Green:</b> Both</span>
+        </div>
+                <div class="flex items-center gap-4">
             <button id="changeBackgroundBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1 px-3 rounded-lg text-xs">Change Background</button>
             <button id="leaveGameBtn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded-lg text-xs">Leave Game</button>
         </div>
@@ -909,10 +924,10 @@
                     boardHTML += `
                         <div id="player-area-${playerId}" class="player-area bg-gray-900/80 rounded-lg p-2 flex gap-2 overflow-hidden ${positionsToUse[index] || ''} ${isMe ? 'my-player-area' : ''}">
                             <div class="flex-shrink-0 w-24 md:w-32 lg:w-40 flex flex-col gap-2">
-                                <div id="${playerId}-commander" class="game-zone h-1/4 clickable-zone"><div class="zone-title">COMMANDER (0)</div><div id="${playerId}-commander-cards" data-zone-name="commander" class="card-container"></div></div>
-                                <div id="${playerId}-library" class="game-zone h-1/4 ${isMe ? 'clickable-zone' : ''}"><div class="zone-title">LIBRARY (0)</div><div data-zone-name="library" class="card-container"></div></div>
-                                <div id="${playerId}-graveyard" class="game-zone h-1/4 clickable-zone"><div class="zone-title">GRAVEYARD (0)</div><div data-zone-name="graveyard" class="card-container"></div></div>
-                                <div id="${playerId}-exile" class="game-zone h-1/4 clickable-zone"><div class="zone-title">EXILE (0)</div><div data-zone-name="exile" class="card-container"></div></div>
+                                <div id="${playerId}-commander" data-click-type="left" class="game-zone h-1/4 clickable-zone"><div class="zone-title">COMMANDER (0)</div><div id="${playerId}-commander-cards" data-zone-name="commander" class="card-container"></div></div>
+                                <div id="${playerId}-library" ${isMe ? 'data-click-type="both"' : ''} class="game-zone h-1/4 ${isMe ? 'clickable-zone' : ''}"><div class="zone-title">LIBRARY (0)</div><div data-zone-name="library" class="card-container"></div></div>
+                                <div id="${playerId}-graveyard" data-click-type="left" class="game-zone h-1/4 clickable-zone"><div class="zone-title">GRAVEYARD (0)</div><div data-zone-name="graveyard" class="card-container"></div></div>
+                                <div id="${playerId}-exile" data-click-type="left" class="game-zone h-1/4 clickable-zone"><div class="zone-title">EXILE (0)</div><div data-zone-name="exile" class="card-container"></div></div>
                             </div>
                             <div id="${playerId}-battlefield-wrapper" class="game-zone flex-grow">
                                 <div class="zone-title">BATTLEFIELD</div>
