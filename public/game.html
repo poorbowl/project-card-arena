@@ -1076,48 +1076,51 @@
             }
 
             function initializeDragAndDrop() {
-                sortableInstances.forEach(s => s.destroy());
-                sortableInstances = [];
-                if (!myPlayerId) return;
+            sortableInstances.forEach(s => s.destroy());
+            sortableInstances = [];
+            if (!myPlayerId) return;
 
-                const options = {
-                    group: 'cards',
-                    animation: 150,
-                    ghostClass: 'sortable-ghost',
-                    dragClass: 'sortable-drag',
-                    onStart: () => document.body.style.cursor = 'grabbing',
-                    onEnd: (event) => {
-                        document.body.style.cursor = '';
-                        handleCardMove(event);
-                    }
-                };
-
-                // Make the hand a draggable area
-                const handEl = document.getElementById('main-player-hand-cards');
-                if (handEl) {
-                    sortableInstances.push(new Sortable(handEl, options));
+            const options = {
+                group: 'cards',
+                animation: 150,
+                ghostClass: 'sortable-ghost',
+                dragClass: 'sortable-drag',
+                onStart: () => document.body.style.cursor = 'grabbing',
+                onEnd: (event) => {
+                    document.body.style.cursor = '';
+                    handleCardMove(event);
                 }
+            };
 
-                // Make every grid slot on your battlefield a draggable/droppable area
-                const myBattlefieldGrid = document.getElementById(`${myPlayerId}-battlefield-grid`);
-                if (myBattlefieldGrid) {
-                    myBattlefieldGrid.querySelectorAll('.grid-slot').forEach(slot => {
-                        sortableInstances.push(new Sortable(slot, options));
-                    });
-                }
-
-                // ADD THIS BLOCK to make the side zones droppable again
-                const sideZoneSelectors = [`#${myPlayerId}-graveyard`, `#${myPlayerId}-exile`, `#${myPlayerId}-commander`];
-                sideZoneSelectors.forEach(selector => {
-                    const zoneEl = document.querySelector(selector);
-                    if (zoneEl) {
-                        const container = zoneEl.querySelector('.card-container');
-                        if (container) {
-                            sortableInstances.push(new Sortable(container, options));
-                        }
+            // This section now iterates over ALL players to make every battlefield a valid drop target.
+            if (gameState && gameState.players) {
+                Object.keys(gameState.players).forEach(playerId => {
+                    const battlefieldGrid = document.getElementById(`${playerId}-battlefield-grid`);
+                    if (battlefieldGrid) {
+                        battlefieldGrid.querySelectorAll('.grid-slot').forEach(slot => {
+                            sortableInstances.push(new Sortable(slot, options));
+                        });
                     }
                 });
             }
+
+            // This original logic remains, ensuring only YOUR hand and side zones are draggable.
+            const handEl = document.getElementById('main-player-hand-cards');
+            if (handEl) {
+                sortableInstances.push(new Sortable(handEl, options));
+            }
+
+            const sideZoneSelectors = [`#${myPlayerId}-graveyard`, `#${myPlayerId}-exile`, `#${myPlayerId}-commander`];
+            sideZoneSelectors.forEach(selector => {
+                const zoneEl = document.querySelector(selector);
+                if (zoneEl) {
+                    const container = zoneEl.querySelector('.card-container');
+                    if (container) {
+                        sortableInstances.push(new Sortable(container, options));
+                    }
+                }
+            });
+        }
             
             function handleCardClick(event) {
                 if (event.metaKey || event.ctrlKey) return;
@@ -1639,61 +1642,80 @@
                     return;
                 }
 
+                // Get the source and destination player IDs from the board.
+                // This defaults to your ID if moving from/to the hand area.
+                const sourcePlayerId = event.from.closest('.player-area')?.id.replace('player-area-', '') || myPlayerId;
+                const destPlayerId = event.to.closest('.player-area')?.id.replace('player-area-', '') || myPlayerId;
+
                 const fromKey = fromZoneEl.dataset.zoneName;
                 const toKey = toZoneEl.dataset.zoneName;
                 const fromSlotEl = event.from.closest('.grid-slot');
                 const toSlotEl = event.to.closest('.grid-slot');
 
-                const playerRef = gameRef.child('players').child(myPlayerId);
-                playerRef.transaction(playerState => {
-                    if (!playerState) return playerState;
+                // Perform the transaction on the parent 'players' node to handle multiple players.
+                const playersRef = gameRef.child('players');
+                playersRef.transaction(allPlayersState => {
+                    if (!allPlayersState) return allPlayersState;
+
+                    const sourcePlayerState = allPlayersState[sourcePlayerId];
+                    const destPlayerState = allPlayersState[destPlayerId];
+
+                    // Safety check: if either player doesn't exist, abort the transaction.
+                    if (!sourcePlayerState || !destPlayerState) {
+                        console.error("Source or destination player not found.");
+                        return; // Abort
+                    }
+
                     let cardToMove = null;
 
-                    // --- FIND AND REMOVE THE CARD ---
+                    // 1. FIND AND REMOVE THE CARD FROM THE SOURCE PLAYER
                     if (fromKey === 'battlefield' && fromSlotEl) {
                         const fromSlotId = fromSlotEl.dataset.slotId;
-                        if (playerState.battlefield && playerState.battlefield[fromSlotId]) {
-                            const cardIndex = playerState.battlefield[fromSlotId].findIndex(c => c && c.instanceId === instanceId);
+                        if (sourcePlayerState.battlefield && sourcePlayerState.battlefield[fromSlotId]) {
+                            const cardIndex = sourcePlayerState.battlefield[fromSlotId].findIndex(c => c && c.instanceId === instanceId);
                             if (cardIndex > -1) {
-                                [cardToMove] = playerState.battlefield[fromSlotId].splice(cardIndex, 1);
-                                if (playerState.battlefield[fromSlotId].length === 0) {
-                                    delete playerState.battlefield[fromSlotId];
+                                [cardToMove] = sourcePlayerState.battlefield[fromSlotId].splice(cardIndex, 1);
+                                if (sourcePlayerState.battlefield[fromSlotId].length === 0) {
+                                    delete sourcePlayerState.battlefield[fromSlotId];
                                 }
                             }
                         }
                     } else { // From hand, graveyard, etc.
-                        if (playerState[fromKey] && Array.isArray(playerState[fromKey])) {
-                            const cardIndex = playerState[fromKey].findIndex(c => c && c.instanceId === instanceId);
+                        if (sourcePlayerState[fromKey] && Array.isArray(sourcePlayerState[fromKey])) {
+                            const cardIndex = sourcePlayerState[fromKey].findIndex(c => c && c.instanceId === instanceId);
                             if (cardIndex > -1) {
-                                [cardToMove] = playerState[fromKey].splice(cardIndex, 1);
+                                [cardToMove] = sourcePlayerState[fromKey].splice(cardIndex, 1);
                             }
                         }
                     }
 
                     if (cardToMove) {
-                        // --- PLACE THE CARD IN ITS DESTINATION ---
+                        // 2. PLACE THE CARD IN ITS DESTINATION FOR THE DESTINATION PLAYER
                         if (toKey === 'battlefield' && toSlotEl) {
                             const toSlotId = toSlotEl.dataset.slotId;
-                            if (!playerState.battlefield) playerState.battlefield = {};
-                            if (!playerState.battlefield[toSlotId]) playerState.battlefield[toSlotId] = [];
+                            if (!destPlayerState.battlefield) destPlayerState.battlefield = {};
+                            if (!destPlayerState.battlefield[toSlotId]) destPlayerState.battlefield[toSlotId] = [];
 
-                            if (playerState.battlefield[toSlotId].length < 2) {
-                                playerState.battlefield[toSlotId].push(cardToMove);
+                            if (destPlayerState.battlefield[toSlotId].length < 2) {
+                                destPlayerState.battlefield[toSlotId].push(cardToMove);
                             } else {
-                                if (!playerState.hand) playerState.hand = [];
-                                playerState.hand.push(cardToMove);
+                                // Fallback: If slot is full, return card to owner's hand
+                                if (!sourcePlayerState.hand) sourcePlayerState.hand = [];
+                                sourcePlayerState.hand.push(cardToMove);
                             }
-                        } else { // Moving to a non-battlefield zone (hand, graveyard, etc.)
-                            if (!playerState[toKey]) playerState[toKey] = [];
-                            // This is the key fix: handle reordering within the hand
-                            if (fromKey === 'hand' && toKey === 'hand') {
-                                playerState.hand.splice(event.newIndex, 0, cardToMove);
+                        } else { // Moving to a non-battlefield zone (e.g., back to your hand)
+                            if (!destPlayerState[toKey]) destPlayerState[toKey] = [];
+                            
+                            if (fromKey === toKey && sourcePlayerId === destPlayerId) { 
+                                destPlayerState[toKey].splice(event.newIndex, 0, cardToMove);
                             } else {
-                                playerState[toKey].push(cardToMove);
+                                destPlayerState[toKey].push(cardToMove);
                             }
                         }
                     }
-                    return playerState;
+                    
+                    // Return the entire, modified players object to be saved to Firebase.
+                    return allPlayersState;
                 });
             }
 
