@@ -641,6 +641,13 @@
                 toGraveyard: []
             };
 
+            const PLAYER_COLORS = [
+                'rgba(34, 197, 94, 0.8)', // Player 1: Green 
+                'rgba(59, 130, 246, 0.8)', // Player 2: Blue 
+                'rgba(234, 179, 8, 0.8)', // Player 3: Yellow
+                'rgba(239, 68, 68, 0.8)' // Player 4: Red  
+            ];
+
             const COMMON_TOKEN_IMAGES = {
                 'Treasure': 'https://firebasestorage.googleapis.com/v0/b/project-card-arena.firebasestorage.app/o/tokens%2FTreasure%20Token.png?alt=media&token=2627be0b-c378-4d7a-b8fa-41efb35f57b7',
                 'Food': 'https://firebasestorage.googleapis.com/v0/b/project-card-arena.firebasestorage.app/o/tokens%2FFood%20Token.png?alt=media&token=87d31a1d-81ae-490f-b862-a9e48a95ebec',
@@ -749,6 +756,43 @@
                 return el;
             }
 
+            function updateOwnershipIndicator(cardEl) {
+                // Safety check to make sure we're dealing with a valid card element
+                if (!cardEl || !cardEl.dataset.instanceId) return;
+
+                const instanceId = cardEl.dataset.instanceId;
+                const cardData = cardDataMap.get(instanceId);
+
+                // We only care about cards that have an owner
+                if (!cardData || !cardData.ownerId) return;
+
+                // Find the player area the card is currently in
+                const playerArea = cardEl.closest('.player-area');
+                
+                // Remove any old owner tag from previous versions, just in case
+                const existingTag = cardEl.querySelector('.owner-tag');
+                if (existingTag) existingTag.remove();
+
+                if (playerArea) {
+                    const battlefieldOwnerId = playerArea.id.replace('player-area-', '');
+                    
+                    // If the card's owner is NOT the same as the battlefield controller...
+                    if (cardData.ownerId !== battlefieldOwnerId) {
+                        // Look up the original owner's color from the game state
+                        const ownerColor = gameState.players[cardData.ownerId]?.color || 'rgba(255, 255, 255, 0.7)'; // Default to white glow
+                        
+                        // Apply a glow using the owner's specific color
+                        cardEl.style.boxShadow = `0 0 12px 4px ${ownerColor}`; 
+                    } else {
+                        // If the owner and controller ARE the same, reset the card's style.
+                        cardEl.style.boxShadow = ''; 
+                    }
+                } else {
+                    // If the card is not in a player area (e.g., in the hand), reset its style.
+                    cardEl.style.boxShadow = '';
+                }
+            }
+
             function updateCardContainer(containerEl, newCards = []) {
                 const existingCardElements = new Map();
                 containerEl.querySelectorAll('.card').forEach(el => {
@@ -796,9 +840,10 @@
 
                 const myPlayerState = gameState.players[myPlayerId];
                 if (myPlayerId !== 'p1' && myPlayerState && !myPlayerState.deckLoaded) {
-                    showDeckSelectionModal();
+                    showDeckSelectionModal(myPlayerId); // Pass the correct player ID
                     return;
                 }
+                
                 deckSelectionModal.classList.add('hidden');
 
                 const orderedPlayerIds = getPlayerOrder(gameState.players);
@@ -881,6 +926,7 @@
                                             cardEl.classList.add('stacked');
                                         }
                                         slot.appendChild(cardEl);
+                                    updateOwnershipIndicator(cardEl);
                                     }
                                 });
                             }
@@ -1811,7 +1857,7 @@
                 pendingOpeningHand = []; // Clear the temporary hand
             }
             
-            function showDeckSelectionModal() {
+            function showDeckSelectionModal(playerId) { // It now accepts a playerId
                 const savedDecks = JSON.parse(localStorage.getItem('savedDecks')) || {};
                 deckSelectionList.innerHTML = '';
 
@@ -1835,7 +1881,8 @@
                             const commanderIds = deckData.commanderIds || [];
                             const fullDeck = cardIds.map(id => allCardsFromDb.find(card => card.id === id)).filter(Boolean);
                             const commanders = commanderIds.map(id => allCardsFromDb.find(card => card.id === id)).filter(Boolean);
-                            loadDeckForPlayer(fullDeck, commanders, playerName);
+                            // This now correctly calls the function from Step 1 with the new signature
+                            loadDeckForPlayer(fullDeck, commanders, playerName, playerId);
                         });
                         deckSelectionList.appendChild(button);
                     }
@@ -1850,22 +1897,22 @@
                 deckSelectionModal.classList.remove('hidden');
             }
 
-            function loadDeckForPlayer(deck, commanders, playerName) {
-                if (!myPlayerId || !deck) return;
+            function loadDeckForPlayer(deck, commanders, playerName, playerId) {
+                if (!playerId || !deck) return;
                 shuffle(deck);
 
                 deck.forEach(card => {
-                // Assign a unique instanceId to each card in the deck
                     card.instanceId = `card-${Date.now()}-${Math.random()}`;
-                    card.ownerId = myPlayerId; 
-            });
+                    card.ownerId = playerId; // Use the 'playerId' parameter to assign owner
+                });
 
                 commanders.forEach(c => {
                     if (!c.instanceId) c.instanceId = `card-${Date.now()}-${Math.random()}`;
-                    c.ownerId = myPlayerId;
+                    c.ownerId = playerId; // Use the 'playerId' parameter to assign owner
                     c.castCount = 0;
                 });
-                gameRef.child('players').child(myPlayerId).update({
+                
+                gameRef.child('players').child(playerId).update({
                     name: playerName,
                     deck: deck,
                     commander: commanders,
@@ -2517,44 +2564,46 @@
 
                                 const pendingData = JSON.parse(localStorage.getItem('pendingJoinData'));
 
+                                // PATH 1: A player is re-joining and needs their deck loaded from localStorage.
                                 if (isAlreadyInGame && pendingData && currentGameState.players[localPlayerId] && !currentGameState.players[localPlayerId].deckLoaded) {
                                     const playerToUpdate = currentGameState.players[localPlayerId];
                                     playerToUpdate.name = pendingData.playerName;
                                     const deck = JSON.parse(JSON.stringify(pendingData.deck));
                                     shuffle(deck);
-                                    deck.forEach(card => { card.instanceId = `card-${Date.now()}-${Math.random()}`; });
+                                    // CRITICAL FIX: Assign ownerId to re-joining player's cards.
+                                    deck.forEach(card => { 
+                                        card.instanceId = `card-${Date.now()}-${Math.random()}`;
+                                        card.ownerId = localPlayerId; // Use the correct localPlayerId
+                                    });
                                     if(pendingData.commanders) {
-                                        pendingData.commanders.forEach(card => { card.instanceId = `card-${Date.now()}-${Math.random()}`; });
+                                        // CRITICAL FIX: Assign ownerId to re-joining player's commanders.
+                                        pendingData.commanders.forEach(card => { 
+                                            card.instanceId = `card-${Date.now()}-${Math.random()}`;
+                                            card.ownerId = localPlayerId; // Use the correct localPlayerId
+                                        });
                                     }
                                     playerToUpdate.deck = deck;
                                     playerToUpdate.commander = pendingData.commanders;
                                     playerToUpdate.deckLoaded = true;
                                     localStorage.removeItem('pendingJoinData');
                                 } 
+                                // PATH 2: A brand new player is joining.
                                 else if (!isAlreadyInGame) {
                                     const p1 = currentGameState.players.p1;
                                     const openSlot = ['p2', 'p3', 'p4'].find(slot => !currentGameState.players[slot]);
                                     if (openSlot) {
                                         localPlayerId = openSlot;
-                                        const startingLife = p1 ? p1.life : 40; 
+                                        const startingLife = p1 ? p1.life : 40;
+                                        const playerIndex = parseInt(openSlot.slice(1), 10) - 1;
+                                        const assignedColor = PLAYER_COLORS[playerIndex];
                                         
-                                        if (pendingData) {
-                                            const deck = JSON.parse(JSON.stringify(pendingData.deck));
-                                            shuffle(deck);
-                                            deck.forEach(card => { card.instanceId = `card-${Date.now()}-${Math.random()}`; });
-                                            if (pendingData.commanders) {
-                                                pendingData.commanders.forEach(card => { card.instanceId = `card-${Date.now()}-${Math.random()}`; });
-                                            }
-                                            
-                                            currentGameState.players[openSlot] = { 
-                                                uid: myUserId, name: pendingData.playerName, life: startingLife, 
-                                                deck: deck, hand: [], battlefield: {}, graveyard:[], exile:[], 
-                                                commander: pendingData.commanders, deckLoaded: true 
-                                            };
-                                            localStorage.removeItem('pendingJoinData');
-                                        } else {
-                                            currentGameState.players[openSlot] = { uid: myUserId, name: `Player ${openSlot.slice(1)}`, life: startingLife, deck: [], hand: [], battlefield: [], graveyard:[], exile:[], commander:[], deckLoaded: false };
-                                        }
+                                        // This logic for creating an empty slot is correct from your file.
+                                        // The ownerId will be assigned later by loadDeckForPlayer.
+                                        currentGameState.players[openSlot] = { 
+                                            uid: myUserId, name: `Player ${openSlot.slice(1)}`, life: startingLife, 
+                                            color: assignedColor,
+                                            deck: [], hand: [], battlefield: [], graveyard:[], exile:[], commander:[], deckLoaded: false 
+                                        };
                                     }
                                 }
 
@@ -2564,21 +2613,33 @@
                                     currentGameState.currentPlayerIndex = 0;
                                 }
 
+                                // PATH 3: The Host (Player 1) is initializing their own game.
                                 const p1 = currentGameState.players.p1;
-                                 if (localPlayerId === 'p1' && p1) {
-                                     if (p1.deck && !p1.shuffled) {
-                                         const deck = JSON.parse(JSON.stringify(p1.deck || []));
-                                         shuffle(deck);
-                                         deck.forEach(card => { card.instanceId = `card-${Date.now()}-${Math.random()}`; });
-                                         p1.deck = deck;
-                                         p1.shuffled = true;
-                                     }
-                                     if (p1.commander && p1.commander.length > 0) {
-                                         p1.commander.forEach(c => {
-                                             if (!c.instanceId) c.instanceId = `card-${Date.now()}-${Math.random()}`;
-                                         });
-                                     }
-                                 }
+                                if (localPlayerId === 'p1' && p1) {
+                                    // Assign color to Player 1 if it doesn't exist
+                                    if (!p1.color) {
+                                        p1.color = PLAYER_COLORS[0];
+                                    }
+                                    if (p1.deck && !p1.shuffled) {
+                                        const deck = JSON.parse(JSON.stringify(p1.deck || []));
+                                        shuffle(deck);
+                                        // CRITICAL FIX: Assign ownerId to P1's cards.
+                                        deck.forEach(card => { 
+                                            card.instanceId = `card-${Date.now()}-${Math.random()}`; 
+                                            card.ownerId = 'p1';
+                                        });
+                                        p1.deck = deck;
+                                        p1.shuffled = true;
+                                    }
+                                    if (p1.commander && p1.commander.length > 0) {
+                                        // CRITICAL FIX: Assign ownerId to P1's commanders.
+                                        p1.commander.forEach(c => {
+                                            if (!c.instanceId) c.instanceId = `card-${Date.now()}-${Math.random()}`;
+                                            c.ownerId = 'p1'; 
+                                            if (c.castCount === undefined) c.castCount = 0;
+                                        });
+                                    }
+                                }
                             }
                             return currentGameState;
                         });
