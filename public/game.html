@@ -1736,6 +1736,11 @@
                     }
 
                     if (cardToMove) {
+                        // If the card is leaving the battlefield, clear its state.
+                        if (fromKey === 'battlefield' && toKey !== 'battlefield') {
+                            delete cardToMove.tapped;
+                            delete cardToMove.counters;
+                        }
                         // 2. PLACE THE CARD IN ITS DESTINATION FOR THE DESTINATION PLAYER
                         if (toKey === 'battlefield' && toSlotEl) {
                             const toSlotId = toSlotEl.dataset.slotId;
