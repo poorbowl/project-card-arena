@@ -906,6 +906,17 @@
                            nameEl.textContent = playerState.name || (playerId === myPlayerId ? 'YOU' : 'OPPONENT');
                         }
                     }
+
+                    // --- START: New Player Color Indicator Logic ---
+                        if (playerState.color) {
+                            // Find the right-side panel within the player's area
+                            const playerControlsPanel = document.getElementById(`${playerId}-controls`); // <--- UPDATED TARGET
+                            if (playerControlsPanel) {
+                                // Apply the player's color as a border (outline)
+                                playerControlsPanel.style.outline = `2px solid ${playerState.color}`;
+                                playerControlsPanel.style.boxShadow = `0 0 15px ${playerState.color}`;
+                            }
+                        }
                     
                     const battlefieldGridEl = document.getElementById(`${playerId}-battlefield-grid`);
                     if (battlefieldGridEl) {
@@ -1024,7 +1035,7 @@
                                 <div class="zone-title">BATTLEFIELD</div>
                                 <div id="${playerId}-battlefield-grid" data-zone-name="battlefield" class="battlefield-grid"></div>
                             </div>
-                            <div class="flex-shrink-0 w-24 md:w-32 flex flex-col items-center justify-between bg-gray-800/80 rounded-lg p-2">
+                            <div id="${playerId}-controls" class="flex-shrink-0 w-24 md:w-32 flex flex-col items-center justify-between bg-gray-800/80 rounded-lg p-2">
                                 ${isMe ? `
                                     <div class="w-full text-center">
                                         <div id="turn-indicator" class="font-bold text-sm mb-1"></div>
