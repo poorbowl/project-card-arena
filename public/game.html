@@ -445,19 +445,41 @@
             opacity: 1;
         }
 
+        /* Player and summary view */
+        .view-btn-active {
+            background-color: #4f46e5; /* indigo-600 */
+            color: white;
+        }
+        body[data-view-mode="summary"] #opponent-selector-wrapper {
+            display: none;
+        }
+
 </style>
 </head>
 <body data-chat-state="closed" class="text-white">
 
     <header class="flex-shrink-0 bg-gray-800 p-2 flex justify-between items-center shadow-md">
-        <div class="text-xs">Game ID: <span id="gameIdDisplay" class="font-mono bg-gray-700 px-2 py-1 rounded"></span></div>
+        <div class="flex items-center gap-4">
+            <div class="text-xs">Game ID: <span id="gameIdDisplay" class="font-mono bg-gray-700 px-2 py-1 rounded"></span></div>
+        </div>
 
+        <div class="flex items-center gap-4 text-xs">
+            <div class="flex rounded-md bg-gray-900 p-1">
+                <button id="player-view-btn" class="px-3 py-1 font-semibold text-white bg-indigo-600 rounded">Player View</button>
+                <button id="summary-view-btn" class="px-3 py-1 font-semibold text-gray-400 rounded">Summary View</button>
+            </div>
+            <div id="opponent-selector-wrapper" class="flex items-center gap-2">
+                <label for="opponent-select" class="font-medium text-gray-400">Focus:</label>
+                <select id="opponent-select" class="bg-gray-700 border border-gray-600 rounded-md py-1 px-2 text-white">
+                    </select>
+            </div>
+        </div>
         <div class="hidden md:flex items-center text-xs space-x-4 text-gray-400">
             <span><b class="text-blue-400">■ Blue:</b> Left-Click to View</span>
             <span><b class="text-yellow-400">■ Yellow:</b> Right-Click for Menu</span>
             <span><b class="text-green-400">■ Green:</b> Both</span>
         </div>
-                <div class="flex items-center gap-4">
+            <div class="flex items-center gap-4">
             <button id="changeBackgroundBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1 px-3 rounded-lg text-xs">Change Background</button>
             <button id="leaveGameBtn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded-lg text-xs">Leave Game</button>
         </div>
@@ -641,6 +663,8 @@
                 toGraveyard: []
             };
 
+            let focusedOpponentId = null;
+
             const PLAYER_COLORS = [
                 'rgba(34, 197, 94, 0.8)', // Player 1: Green 
                 'rgba(59, 130, 246, 0.8)', // Player 2: Blue 
@@ -756,6 +780,27 @@
                 return el;
             }
 
+            // Calculate Battlefield grid slots
+            function calculateAndCreateSlots(gridEl) {
+                if (!gridEl) return;
+
+                const slotWidth = 110; // The minimum width of a card slot
+                const gap = 8; // The space between slots (0.5rem)
+                const gridWidth = gridEl.offsetWidth;
+
+                // Calculate how many columns can fit in the available width
+                const numCols = Math.floor(gridWidth / (slotWidth + gap));
+                const totalSlots = numCols * 2; // We want two rows
+
+                gridEl.innerHTML = ''; // Clear any old slots
+                for (let i = 0; i < totalSlots; i++) {
+                    const slot = document.createElement('div');
+                    slot.className = 'grid-slot';
+                    slot.dataset.slotId = i + 1; // Start labeling from 1 instead of 0
+                    gridEl.appendChild(slot);
+                }
+            }
+
             function updateOwnershipIndicator(cardEl) {
                 // Safety check to make sure we're dealing with a valid card element
                 if (!cardEl || !cardEl.dataset.instanceId) return;
@@ -840,26 +885,55 @@
 
                 const myPlayerState = gameState.players[myPlayerId];
                 if (myPlayerId !== 'p1' && myPlayerState && !myPlayerState.deckLoaded) {
-                    showDeckSelectionModal(myPlayerId); // Pass the correct player ID
+                    showDeckSelectionModal(myPlayerId);
                     return;
                 }
-                
                 deckSelectionModal.classList.add('hidden');
 
-                const orderedPlayerIds = getPlayerOrder(gameState.players);
+                // --- Determine which players to display ---
+                const opponentIds = Object.keys(gameState.players).filter(id => id !== myPlayerId);
+                const opponentSelect = document.getElementById('opponent-select');
+                if (opponentSelect) {
+                    const currentSelection = opponentSelect.value;
+                    opponentSelect.innerHTML = '';
+                    opponentIds.forEach(id => {
+                        const option = document.createElement('option');
+                        option.value = id;
+                        option.textContent = gameState.players[id].name || `Player ${id.slice(1)}`;
+                        opponentSelect.appendChild(option);
+                    });
+                    if (!focusedOpponentId && opponentIds.length > 0) {
+                        focusedOpponentId = opponentIds[0];
+                    }
+                    if (currentSelection && opponentIds.includes(currentSelection)) {
+                        opponentSelect.value = currentSelection;
+                    } else if (focusedOpponentId) {
+                        opponentSelect.value = focusedOpponentId;
+                    }
+                }
+
+                let orderedPlayerIds;
+                const viewMode = document.body.dataset.viewMode;
+
+                if (viewMode === 'player' && focusedOpponentId && opponentIds.includes(focusedOpponentId)) {
+                    orderedPlayerIds = [myPlayerId, focusedOpponentId];
+                } else {
+                    orderedPlayerIds = getPlayerOrder(gameState.players);
+                }
+
                 const playerCount = orderedPlayerIds.length;
                 const boardPlayerCount = mainGridEl.querySelectorAll('.player-area').length;
                 
                 if (playerCount !== boardPlayerCount) {
                     setupBoardHTML(orderedPlayerIds);
+                    return;
                 }
 
+                // --- Continue with standard rendering ---
                 cardDataMap.clear();
                 Object.values(gameState.players).forEach(player => {
                     if (!player) return;
                     const arrayZones = ['hand', 'graveyard', 'exile', 'commander', 'deck'];
-
-                    // Handle array-based zones first
                     arrayZones.forEach(zoneKey => {
                         if (player[zoneKey] && Array.isArray(player[zoneKey])) {
                             player[zoneKey].forEach(card => {
@@ -867,10 +941,8 @@
                             });
                         }
                     });
-
-                    // Handle the object-based battlefield zone separately, looking inside stacks
                     if (player.battlefield && typeof player.battlefield === 'object') {
-                        Object.values(player.battlefield).flat().forEach(card => { // .flat() is key for handling stacks
+                        Object.values(player.battlefield).flat().forEach(card => { 
                             if (card && card.instanceId) cardDataMap.set(card.instanceId, card);
                         });
                     }
@@ -878,7 +950,6 @@
 
                 const currentPlayerId = gameState.turnOrder[gameState.currentPlayerIndex];
                 const currentPlayer = gameState.players[currentPlayerId];
-                
                 const turnIndicatorEl = document.getElementById('turn-indicator');
                 const passTurnBtn = document.getElementById('passTurnBtn');
 
@@ -894,7 +965,6 @@
                     document.getElementById(`player-area-${currentPlayerId}`)?.classList.add('active-player-turn');
                 }
 
-
                 orderedPlayerIds.forEach(playerId => {
                     const playerState = gameState.players[playerId];
                     if (!playerState) return;
@@ -903,29 +973,22 @@
                     if(playerArea) {
                         const nameEl = playerArea.querySelector('.player-name-display');
                         if (nameEl) {
-                           nameEl.textContent = playerState.name || (playerId === myPlayerId ? 'YOU' : 'OPPONENT');
+                        nameEl.textContent = playerState.name || (playerId === myPlayerId ? 'YOU' : 'OPPONENT');
                         }
-                    }
-
-                    // --- START: New Player Color Indicator Logic ---
                         if (playerState.color) {
-                            // Find the right-side panel within the player's area
-                            const playerControlsPanel = document.getElementById(`${playerId}-controls`); // <--- UPDATED TARGET
+                            const playerControlsPanel = document.getElementById(`${playerId}-controls`);
                             if (playerControlsPanel) {
-                                // Apply the player's color as a border (outline)
                                 playerControlsPanel.style.outline = `2px solid ${playerState.color}`;
                                 playerControlsPanel.style.boxShadow = `0 0 15px ${playerState.color}`;
                             }
                         }
+                    }
                     
                     const battlefieldGridEl = document.getElementById(`${playerId}-battlefield-grid`);
                     if (battlefieldGridEl) {
-                        // First, clear all cards from the grid slots
                         battlefieldGridEl.querySelectorAll('.grid-slot').forEach(slot => {
-                            slot.innerHTML = ''; // This will remove ALL cards from the slot
+                            slot.innerHTML = '';
                         });
-
-                        // Now, place cards from the new data structure into the grid
                         const battlefieldCards = playerState.battlefield || {};
                         Object.entries(battlefieldCards).forEach(([slotId, cardArray]) => {
                             const slot = battlefieldGridEl.querySelector(`[data-slot-id="${slotId}"]`);
@@ -933,11 +996,11 @@
                                 cardArray.forEach((cardData, index) => {
                                     if (cardData) {
                                         const cardEl = createCardElement(cardData);
-                                        if (index > 0) { // If it's not the first card in the slot
+                                        if (index > 0) {
                                             cardEl.classList.add('stacked');
                                         }
                                         slot.appendChild(cardEl);
-                                    updateOwnershipIndicator(cardEl);
+                                        updateOwnershipIndicator(cardEl);
                                     }
                                 });
                             }
@@ -948,16 +1011,13 @@
                     document.getElementById(`${playerId}-exile`).querySelector('.zone-title').textContent = `EXILE (${(playerState.exile || []).length})`;
                     const commanderZone = playerState.commander || [];
                     let totalTax = 0;
-                    // Calculate the total tax from all commanders in the zone
                     commanderZone.forEach(card => {
                         if (card && card.castCount > 0) {
                             totalTax += card.castCount * 2;
                         }
                     });
-
                     let commanderTitle = `COMMANDER (${commanderZone.length})`;
                     if (totalTax > 0) {
-                        // Append the tax to the title if it's greater than zero
                         commanderTitle += ` | Tax: +${totalTax}`;
                     }
                     document.getElementById(`${playerId}-commander`).querySelector('.zone-title').textContent = commanderTitle;
@@ -968,7 +1028,6 @@
                     if (handSizeEl) {
                         handSizeEl.textContent = `Hand: ${(playerState.hand || []).length}`;
                     }
-
                     document.querySelectorAll(`#${playerId}-graveyard .card, #${playerId}-exile .card, #${playerId}-library .card, #${playerId}-commander .card`).forEach(c => c.remove());
                 });
 
@@ -982,29 +1041,8 @@
                 addCardEventListeners();
             }
 
-            // Calculate Battlefield grid slots
-            function calculateAndCreateSlots(gridEl) {
-                if (!gridEl) return;
-
-                const slotWidth = 110; // The minimum width of a card slot
-                const gap = 8; // The space between slots (0.5rem)
-                const gridWidth = gridEl.offsetWidth;
-
-                // Calculate how many columns can fit in the available width
-                const numCols = Math.floor(gridWidth / (slotWidth + gap));
-                const totalSlots = numCols * 2; // We want two rows
-
-                gridEl.innerHTML = ''; // Clear any old slots
-                for (let i = 0; i < totalSlots; i++) {
-                    const slot = document.createElement('div');
-                    slot.className = 'grid-slot';
-                    slot.dataset.slotId = i + 1; // Start labeling from 1 instead of 0
-                    gridEl.appendChild(slot);
-                }
-            }
-
             function setupBoardHTML(orderedPlayerIds) {
-                 const playerCount = orderedPlayerIds.length;
+                const playerCount = orderedPlayerIds.length;
                 let gridWrapperClass = 'w-full h-full grid gap-2';
                 if (playerCount <= 2) {
                     gridWrapperClass += ' grid-rows-2';
@@ -1040,23 +1078,17 @@
                                     <div class="w-full text-center">
                                         <div id="turn-indicator" class="font-bold text-sm mb-1"></div>
                                     </div>
-
-                                    <!-- NEW D20 DICE ROLLER ELEMENT -->
                                     <div id="dice-roller" class="my-2 flex flex-col items-center cursor-pointer group">
                                         <div id="d20-icon" class="w-12 h-12 border-2 border-gray-500 rounded-lg flex items-center justify-center text-2xl font-bold group-hover:bg-gray-700 transition-colors">
                                             <span id="d20-result">20</span>
                                         </div>
                                         <span class="text-xs text-gray-500 mt-1">Roll d20</span>
                                     </div>
-                                    <!-- END OF NEW ELEMENT -->
-
                                     <div class="flex flex-col items-center">
-                                        
                                         <div class="flex items-center justify-between w-full">
                                             <span class="player-name-display font-bold text-gray-400 text-xs md:text-sm">${playerState.name || 'YOU'}</span>
                                             <span id="${playerId}-hand-size" class="text-xs text-gray-400">Hand: 0</span>
                                         </div>
-
                                         <input type="number" id="${playerId}-life-total" class="life-total-input text-4xl lg:text-5xl font-bold" value="40">
                                         <div class="flex gap-1 md:gap-2 mt-2">
                                             <button data-player-id="${playerId}" data-action="decrement" class="bg-red-600 w-8 h-8 md:w-10 md:h-10 text-xl md:text-2xl rounded-full">-</button>
@@ -1085,15 +1117,13 @@
                 boardHTML += `</div>`;
                 mainGridEl.innerHTML = boardHTML;
 
-                // Use a timeout to ensure the grid has been rendered before we measure it
                 setTimeout(() => {
                     orderedPlayerIds.forEach(playerId => {
                         const gridEl = document.getElementById(`${playerId}-battlefield-grid`);
                         calculateAndCreateSlots(gridEl);
                     });
-                    // After creating the correct number of slots, we need to re-render to place any existing cards.
-                    renderBoard();
-                }, 100); // A 100ms delay gives the browser time to render
+                    renderBoard(); // This call is now safe
+                }, 100); 
                 
                 document.querySelectorAll('.clickable-zone').forEach(el => {
                     const playerId = el.id.split('-')[0];
@@ -1109,7 +1139,7 @@
                         el.addEventListener('click', () => openZoneViewer(playerId, zoneName));
                     }
                 });
-                 const createTokenBtn = document.getElementById('create-token-btn');
+                const createTokenBtn = document.getElementById('create-token-btn');
                 if(createTokenBtn) {
                     createTokenBtn.addEventListener('click', () => tokenCreatorModal.classList.remove('hidden'));
                 }
@@ -1119,65 +1149,65 @@
                 }
             }
 
-            function drawCard() {
-                const playerRef = gameRef.child('players').child(myPlayerId);
-                playerRef.transaction(playerState => {
-                    if (playerState && playerState.deck && playerState.deck.length > 0) {
-                        const cardToDraw = playerState.deck.pop();
-                        
-                        if (!playerState.hand) playerState.hand = [];
-                        playerState.hand.push(cardToDraw);
+                function drawCard() {
+                    const playerRef = gameRef.child('players').child(myPlayerId);
+                    playerRef.transaction(playerState => {
+                        if (playerState && playerState.deck && playerState.deck.length > 0) {
+                            const cardToDraw = playerState.deck.pop();
+                            
+                            if (!playerState.hand) playerState.hand = [];
+                            playerState.hand.push(cardToDraw);
+                        }
+                        return playerState;
+                    });
+                }
+
+                function initializeDragAndDrop() {
+                sortableInstances.forEach(s => s.destroy());
+                sortableInstances = [];
+                if (!myPlayerId) return;
+
+                const options = {
+                    group: 'cards',
+                    animation: 150,
+                    ghostClass: 'sortable-ghost',
+                    dragClass: 'sortable-drag',
+                    onStart: () => document.body.style.cursor = 'grabbing',
+                    onEnd: (event) => {
+                        document.body.style.cursor = '';
+                        handleCardMove(event);
                     }
-                    return playerState;
+                };
+
+                // This section now iterates over ALL players to make every battlefield a valid drop target.
+                if (gameState && gameState.players) {
+                    Object.keys(gameState.players).forEach(playerId => {
+                        const battlefieldGrid = document.getElementById(`${playerId}-battlefield-grid`);
+                        if (battlefieldGrid) {
+                            battlefieldGrid.querySelectorAll('.grid-slot').forEach(slot => {
+                                sortableInstances.push(new Sortable(slot, options));
+                            });
+                        }
+                    });
+                }
+
+                // This original logic remains, ensuring only YOUR hand and side zones are draggable.
+                const handEl = document.getElementById('main-player-hand-cards');
+                if (handEl) {
+                    sortableInstances.push(new Sortable(handEl, options));
+                }
+
+                const sideZoneSelectors = [`#${myPlayerId}-graveyard`, `#${myPlayerId}-exile`, `#${myPlayerId}-commander`];
+                sideZoneSelectors.forEach(selector => {
+                    const zoneEl = document.querySelector(selector);
+                    if (zoneEl) {
+                        const container = zoneEl.querySelector('.card-container');
+                        if (container) {
+                            sortableInstances.push(new Sortable(container, options));
+                        }
+                    }
                 });
             }
-
-            function initializeDragAndDrop() {
-            sortableInstances.forEach(s => s.destroy());
-            sortableInstances = [];
-            if (!myPlayerId) return;
-
-            const options = {
-                group: 'cards',
-                animation: 150,
-                ghostClass: 'sortable-ghost',
-                dragClass: 'sortable-drag',
-                onStart: () => document.body.style.cursor = 'grabbing',
-                onEnd: (event) => {
-                    document.body.style.cursor = '';
-                    handleCardMove(event);
-                }
-            };
-
-            // This section now iterates over ALL players to make every battlefield a valid drop target.
-            if (gameState && gameState.players) {
-                Object.keys(gameState.players).forEach(playerId => {
-                    const battlefieldGrid = document.getElementById(`${playerId}-battlefield-grid`);
-                    if (battlefieldGrid) {
-                        battlefieldGrid.querySelectorAll('.grid-slot').forEach(slot => {
-                            sortableInstances.push(new Sortable(slot, options));
-                        });
-                    }
-                });
-            }
-
-            // This original logic remains, ensuring only YOUR hand and side zones are draggable.
-            const handEl = document.getElementById('main-player-hand-cards');
-            if (handEl) {
-                sortableInstances.push(new Sortable(handEl, options));
-            }
-
-            const sideZoneSelectors = [`#${myPlayerId}-graveyard`, `#${myPlayerId}-exile`, `#${myPlayerId}-commander`];
-            sideZoneSelectors.forEach(selector => {
-                const zoneEl = document.querySelector(selector);
-                if (zoneEl) {
-                    const container = zoneEl.querySelector('.card-container');
-                    if (container) {
-                        sortableInstances.push(new Sortable(container, options));
-                    }
-                }
-            });
-        }
             
             function handleCardClick(event) {
                 if (event.metaKey || event.ctrlKey) return;
@@ -2613,13 +2643,36 @@
                                         const playerIndex = parseInt(openSlot.slice(1), 10) - 1;
                                         const assignedColor = PLAYER_COLORS[playerIndex];
                                         
-                                        // This logic for creating an empty slot is correct from your file.
-                                        // The ownerId will be assigned later by loadDeckForPlayer.
-                                        currentGameState.players[openSlot] = { 
-                                            uid: myUserId, name: `Player ${openSlot.slice(1)}`, life: startingLife, 
-                                            color: assignedColor,
-                                            deck: [], hand: [], battlefield: [], graveyard:[], exile:[], commander:[], deckLoaded: false 
-                                        };
+                                        // This logic handles a brand new player OR a re-joining player who needs their deck loaded.
+                                        if (pendingData) {
+                                            const deck = JSON.parse(JSON.stringify(pendingData.deck));
+                                            shuffle(deck);
+                                            deck.forEach(card => { 
+                                                card.instanceId = `card-${Date.now()}-${Math.random()}`; 
+                                                card.ownerId = localPlayerId; // Use the correct player ID
+                                            });
+                                            if (pendingData.commanders) {
+                                                pendingData.commanders.forEach(card => { 
+                                                    card.instanceId = `card-${Date.now()}-${Math.random()}`;
+                                                    card.ownerId = localPlayerId; // Use the correct player ID
+                                                });
+                                            }
+                                            
+                                            currentGameState.players[openSlot] = { 
+                                                uid: myUserId, name: pendingData.playerName, life: startingLife, 
+                                                color: assignedColor,
+                                                deck: deck, hand: [], battlefield: {}, graveyard:[], exile:[], 
+                                                commander: pendingData.commanders, deckLoaded: true 
+                                            };
+                                            localStorage.removeItem('pendingJoinData');
+                                        } else {
+                                            // This creates the empty slot for a new player.
+                                            currentGameState.players[openSlot] = { 
+                                                uid: myUserId, name: `Player ${openSlot.slice(1)}`, life: startingLife, 
+                                                color: assignedColor,
+                                                deck: [], hand: [], battlefield: [], graveyard:[], exile:[], commander:[], deckLoaded: false 
+                                            };
+                                        }
                                     }
                                 }
 
@@ -2707,6 +2760,44 @@
                     // No user is signed in. Redirect to the login page.
                     window.location.href = 'index.html';
                 }
+            });
+
+            // Player and Summary View
+            const playerViewBtn = document.getElementById('player-view-btn');
+            const summaryViewBtn = document.getElementById('summary-view-btn');
+            const opponentSelect = document.getElementById('opponent-select');
+
+            document.body.dataset.viewMode = 'player';
+
+            playerViewBtn.addEventListener('click', () => {
+                document.body.dataset.viewMode = 'player';
+                playerViewBtn.classList.add('view-btn-active', 'bg-indigo-600');
+                playerViewBtn.classList.remove('text-gray-400');
+                summaryViewBtn.classList.remove('view-btn-active', 'bg-indigo-600');
+                summaryViewBtn.classList.add('text-gray-400');
+                // Directly rebuild the board for the focused view
+                if(focusedOpponentId) {
+                    setupBoardHTML([myPlayerId, focusedOpponentId]);
+                } else {
+                    // Fallback for 2-player games
+                    setupBoardHTML(getPlayerOrder(gameState.players));
+                }
+            });
+
+            summaryViewBtn.addEventListener('click', () => {
+                document.body.dataset.viewMode = 'summary';
+                summaryViewBtn.classList.add('view-btn-active', 'bg-indigo-600');
+                summaryViewBtn.classList.remove('text-gray-400');
+                playerViewBtn.classList.remove('view-btn-active', 'bg-indigo-600');
+                playerViewBtn.classList.add('text-gray-400');
+                // Directly rebuild the board for the summary view
+                setupBoardHTML(getPlayerOrder(gameState.players));
+            });
+
+            opponentSelect.addEventListener('change', (e) => {
+                focusedOpponentId = e.target.value;
+                // Directly rebuild the board with the new opponent in focus
+                setupBoardHTML([myPlayerId, focusedOpponentId]);
             });
         }
             
