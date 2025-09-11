@@ -454,6 +454,46 @@
             display: none;
         }
 
+        /* CSS for the new Summary View */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+        .summary-player-column {
+            background-color: rgba(17, 24, 39, 0.9); /* Changed to match the player hand color */
+            border-radius: 0.5rem;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+        }
+        .summary-player-header {
+            border-bottom: 2px solid;
+            padding-bottom: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .summary-card-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .summary-card-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .summary-card-item:hover {
+            background-color: rgba(79, 70, 229, 0.5); /* indigo-600 */
+        }
+
 </style>
 </head>
 <body data-chat-state="closed" class="text-white">
@@ -883,6 +923,16 @@
             function renderBoard() {
                 if (!gameState || !gameState.players || !myPlayerId) return;
 
+                // --- START: Consolidated View Logic ---
+                const viewMode = document.body.dataset.viewMode;
+
+                // If we are in summary view, call the summary function and stop.
+                if (viewMode === 'summary') {
+                    renderSummaryView();
+                    return;
+                }
+
+                // If we are in Player View, proceed with the standard board render.
                 const myPlayerState = gameState.players[myPlayerId];
                 if (myPlayerId !== 'p1' && myPlayerState && !myPlayerState.deckLoaded) {
                     showDeckSelectionModal(myPlayerId);
@@ -890,7 +940,6 @@
                 }
                 deckSelectionModal.classList.add('hidden');
 
-                // --- Determine which players to display ---
                 const opponentIds = Object.keys(gameState.players).filter(id => id !== myPlayerId);
                 const opponentSelect = document.getElementById('opponent-select');
                 if (opponentSelect) {
@@ -913,8 +962,6 @@
                 }
 
                 let orderedPlayerIds;
-                const viewMode = document.body.dataset.viewMode;
-
                 if (viewMode === 'player' && focusedOpponentId && opponentIds.includes(focusedOpponentId)) {
                     orderedPlayerIds = [myPlayerId, focusedOpponentId];
                 } else {
@@ -923,13 +970,14 @@
 
                 const playerCount = orderedPlayerIds.length;
                 const boardPlayerCount = mainGridEl.querySelectorAll('.player-area').length;
-                
+
                 if (playerCount !== boardPlayerCount) {
                     setupBoardHTML(orderedPlayerIds);
                     return;
                 }
+                // --- END: Consolidated View Logic ---
 
-                // --- Continue with standard rendering ---
+                // Standard rendering continues from here...
                 cardDataMap.clear();
                 Object.values(gameState.players).forEach(player => {
                     if (!player) return;
@@ -942,39 +990,26 @@
                         }
                     });
                     if (player.battlefield && typeof player.battlefield === 'object') {
-                        Object.values(player.battlefield).flat().forEach(card => { 
+                        Object.values(player.battlefield).flat().forEach(card => {
                             if (card && card.instanceId) cardDataMap.set(card.instanceId, card);
                         });
                     }
                 });
 
                 const currentPlayerId = gameState.turnOrder[gameState.currentPlayerIndex];
-                const currentPlayer = gameState.players[currentPlayerId];
-                const turnIndicatorEl = document.getElementById('turn-indicator');
-                const passTurnBtn = document.getElementById('passTurnBtn');
-
-                if (currentPlayer && turnIndicatorEl) {
-                    turnIndicatorEl.textContent = `${currentPlayer.name}'s Turn`;
-                }
-                if (passTurnBtn) {
-                    passTurnBtn.disabled = currentPlayerId !== myPlayerId;
-                }
-
                 document.querySelectorAll('.player-area').forEach(el => el.classList.remove('active-player-turn'));
-                if (currentPlayerId) {
-                    document.getElementById(`player-area-${currentPlayerId}`)?.classList.add('active-player-turn');
-                }
+                if (currentPlayerId) document.getElementById(`player-area-${currentPlayerId}`)?.classList.add('active-player-turn');
+                const turnIndicatorEl = document.getElementById('turn-indicator');
+                if (turnIndicatorEl) turnIndicatorEl.textContent = `${gameState.players[currentPlayerId]?.name}'s Turn`;
+
 
                 orderedPlayerIds.forEach(playerId => {
                     const playerState = gameState.players[playerId];
                     if (!playerState) return;
-                    
+
                     const playerArea = document.getElementById(`player-area-${playerId}`);
-                    if(playerArea) {
-                        const nameEl = playerArea.querySelector('.player-name-display');
-                        if (nameEl) {
-                        nameEl.textContent = playerState.name || (playerId === myPlayerId ? 'YOU' : 'OPPONENT');
-                        }
+                    if (playerArea) {
+                        playerArea.querySelector('.player-name-display').textContent = playerState.name || (playerId === myPlayerId ? 'YOU' : 'OPPONENT');
                         if (playerState.color) {
                             const playerControlsPanel = document.getElementById(`${playerId}-controls`);
                             if (playerControlsPanel) {
@@ -982,13 +1017,25 @@
                                 playerControlsPanel.style.boxShadow = `0 0 15px ${playerState.color}`;
                             }
                         }
+                        document.getElementById(`${playerId}-graveyard`).querySelector('.zone-title').textContent = `GRAVEYARD (${(playerState.graveyard || []).length})`;
+                        document.getElementById(`${playerId}-exile`).querySelector('.zone-title').textContent = `EXILE (${(playerState.exile || []).length})`;
+                        const commanderZone = playerState.commander || [];
+                        let totalTax = 0;
+                        commanderZone.forEach(card => {
+                            if (card && card.castCount > 0) totalTax += card.castCount * 2;
+                        });
+                        let commanderTitle = `COMMANDER (${commanderZone.length})`;
+                        if (totalTax > 0) commanderTitle += ` | Tax: +${totalTax}`;
+                        document.getElementById(`${playerId}-commander`).querySelector('.zone-title').textContent = commanderTitle;
+                        document.getElementById(`${playerId}-library`).querySelector('.zone-title').textContent = `LIBRARY (${(playerState.deck || []).length})`;
+                        document.getElementById(`${playerId}-life-total`).value = playerState.life ?? 40;
+                        const handSizeEl = document.getElementById(`${playerId}-hand-size`);
+                        if (handSizeEl) handSizeEl.textContent = `Hand: ${(playerState.hand || []).length}`;
                     }
-                    
+
                     const battlefieldGridEl = document.getElementById(`${playerId}-battlefield-grid`);
                     if (battlefieldGridEl) {
-                        battlefieldGridEl.querySelectorAll('.grid-slot').forEach(slot => {
-                            slot.innerHTML = '';
-                        });
+                        battlefieldGridEl.querySelectorAll('.grid-slot').forEach(slot => slot.innerHTML = '');
                         const battlefieldCards = playerState.battlefield || {};
                         Object.entries(battlefieldCards).forEach(([slotId, cardArray]) => {
                             const slot = battlefieldGridEl.querySelector(`[data-slot-id="${slotId}"]`);
@@ -996,9 +1043,7 @@
                                 cardArray.forEach((cardData, index) => {
                                     if (cardData) {
                                         const cardEl = createCardElement(cardData);
-                                        if (index > 0) {
-                                            cardEl.classList.add('stacked');
-                                        }
+                                        if (index > 0) cardEl.classList.add('stacked');
                                         slot.appendChild(cardEl);
                                         updateOwnershipIndicator(cardEl);
                                     }
@@ -1006,29 +1051,6 @@
                             }
                         });
                     }
-                    
-                    document.getElementById(`${playerId}-graveyard`).querySelector('.zone-title').textContent = `GRAVEYARD (${(playerState.graveyard || []).length})`;
-                    document.getElementById(`${playerId}-exile`).querySelector('.zone-title').textContent = `EXILE (${(playerState.exile || []).length})`;
-                    const commanderZone = playerState.commander || [];
-                    let totalTax = 0;
-                    commanderZone.forEach(card => {
-                        if (card && card.castCount > 0) {
-                            totalTax += card.castCount * 2;
-                        }
-                    });
-                    let commanderTitle = `COMMANDER (${commanderZone.length})`;
-                    if (totalTax > 0) {
-                        commanderTitle += ` | Tax: +${totalTax}`;
-                    }
-                    document.getElementById(`${playerId}-commander`).querySelector('.zone-title').textContent = commanderTitle;
-                    document.getElementById(`${playerId}-library`).querySelector('.zone-title').textContent = `LIBRARY (${(playerState.deck || []).length})`;
-                    document.getElementById(`${playerId}-life-total`).value = playerState.life ?? 40;
-
-                    const handSizeEl = document.getElementById(`${playerId}-hand-size`);
-                    if (handSizeEl) {
-                        handSizeEl.textContent = `Hand: ${(playerState.hand || []).length}`;
-                    }
-                    document.querySelectorAll(`#${playerId}-graveyard .card, #${playerId}-exile .card, #${playerId}-library .card, #${playerId}-commander .card`).forEach(c => c.remove());
                 });
 
                 if (myPlayerState) {
@@ -1036,9 +1058,61 @@
                     updateCardContainer(handCardsEl, myPlayerState.hand || []);
                     handAreaEl.querySelector('.zone-title').textContent = `HAND (${(myPlayerState.hand || []).length})`;
                 }
-                
+
                 initializeDragAndDrop();
                 addCardEventListeners();
+            }
+
+            function renderSummaryView() {
+                const players = getPlayerOrder(gameState.players);
+                let summaryHTML = '<div class="summary-grid">';
+
+                players.forEach(playerId => {
+                    const player = gameState.players[playerId];
+                    if (!player) return;
+
+                    // Create a column for each player
+                    summaryHTML += `
+                        <div class="summary-player-column">
+                            <div class="summary-player-header" style="outline-color: ${player.color || '#4b5563'}">
+                                <h3 class="font-bold text-lg">${player.name || `Player ${playerId.slice(1)}`}</h3>
+                                <span class="text-sm text-gray-400">Battlefield</span>
+                            </div>
+                            <ul class="summary-card-list">
+                    `;
+
+                    const battlefieldCards = Object.values(player.battlefield || {}).flat();
+
+                    if (battlefieldCards.length === 0) {
+                        summaryHTML += '<li class="summary-card-item text-gray-500 italic">No cards on battlefield.</li>';
+                    } else {
+                        battlefieldCards.forEach(card => {
+                            if (!card) return;
+                            // Each card is a list item with its details
+                            summaryHTML += `
+                                <li class="summary-card-item" data-instance-id="${card.instanceId}">
+                                    <span class="font-semibold">${card.name}</span>
+                                    <span class="text-xs text-gray-400">${card.type || 'Card'}</span>
+                                    ${card.power ? `<span class="font-bold text-sm bg-gray-700 px-2 py-0.5 rounded">${card.power}/${card.toughness}</span>` : ''}
+                                </li>
+                            `;
+                        });
+                    }
+                    
+                    summaryHTML += '</ul></div>';
+                });
+
+                summaryHTML += '</div>';
+                mainGridEl.innerHTML = summaryHTML; // Replace the main grid with the summary view
+
+                // Re-attach mouseover listeners so the popout still works
+                document.querySelectorAll('.summary-card-item').forEach(item => {
+                    if (item.dataset.instanceId) {
+                        item.addEventListener('mouseenter', handleCardMouseOver);
+                        item.addEventListener('mouseleave', handleCardMouseOut);
+                        item.addEventListener('mousemove', handleCardMouseMove);
+                    }
+                });
             }
 
             function setupBoardHTML(orderedPlayerIds) {
