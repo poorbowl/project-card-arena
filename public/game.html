@@ -2045,21 +2045,24 @@
                 if (!playerId || !deck) return;
                 shuffle(deck);
 
-                deck.forEach(card => {
-                    card.instanceId = `card-${Date.now()}-${Math.random()}`;
-                    card.ownerId = playerId; // Use the 'playerId' parameter to assign owner
-                });
+                // Use .map() to create a new array with new card objects, each with a unique instanceId.
+                const processedDeck = deck.map(card => ({
+                    ...card,
+                    instanceId: `card-${Date.now()}-${Math.random()}`,
+                    ownerId: playerId
+                }));
 
-                commanders.forEach(c => {
-                    if (!c.instanceId) c.instanceId = `card-${Date.now()}-${Math.random()}`;
-                    c.ownerId = playerId; // Use the 'playerId' parameter to assign owner
-                    c.castCount = 0;
-                });
+                const processedCommanders = commanders.map(card => ({
+                    ...card,
+                    instanceId: `card-${Date.now()}-${Math.random()}`,
+                    ownerId: playerId,
+                    castCount: 0
+                }));
                 
                 gameRef.child('players').child(playerId).update({
                     name: playerName,
-                    deck: deck,
-                    commander: commanders,
+                    deck: processedDeck,
+                    commander: processedCommanders,
                     deckLoaded: true
                 });
                 deckSelectionModal.classList.add('hidden');
