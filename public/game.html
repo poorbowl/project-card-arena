@@ -1033,6 +1033,8 @@
                         if (handSizeEl) handSizeEl.textContent = `Hand: ${(playerState.hand || []).length}`;
                     }
 
+                    document.querySelectorAll(`#${playerId}-graveyard .card, #${playerId}-exile .card, #${playerId}-library .card, #${playerId}-commander .card`).forEach(c => c.remove());
+
                     const battlefieldGridEl = document.getElementById(`${playerId}-battlefield-grid`);
                     if (battlefieldGridEl) {
                         battlefieldGridEl.querySelectorAll('.grid-slot').forEach(slot => slot.innerHTML = '');
