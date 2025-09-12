@@ -2015,11 +2015,18 @@
                             const cardIds = deckData.cardIds || [];
                             const commanderIds = deckData.commanderIds || [];
                             
-                            // Convert card IDs back into full card objects from our master list
-                            const fullDeck = cardIds.map(id => allCardsFromDb.find(card => card.id === id)).filter(Boolean);
+                            // Create a Set of commander IDs for efficient lookup
+                            const commanderIdSet = new Set(commanderIds);
+
+                            // Create the main deck by filtering out the commanders
+                            const mainDeck = cardIds
+                                .map(id => allCardsFromDb.find(card => card.id === id))
+                                .filter(card => card && !commanderIdSet.has(card.id));
+
                             const commanders = commanderIds.map(id => allCardsFromDb.find(card => card.id === id)).filter(Boolean);
                             
-                            loadDeckForPlayer(fullDeck, commanders, playerName, playerId);
+                            // Pass the filtered 'mainDeck' to the function
+                            loadDeckForPlayer(mainDeck, commanders, playerName, playerId);
                         });
                         deckSelectionList.appendChild(button);
                     }
