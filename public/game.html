@@ -1979,16 +1979,29 @@
                 pendingOpeningHand = []; // Clear the temporary hand
             }
             
-            function showDeckSelectionModal(playerId) { // It now accepts a playerId
-                const savedDecks = JSON.parse(localStorage.getItem('savedDecks')) || {};
+            async function showDeckSelectionModal(playerId) {
+                // Fetch decks directly from Firestore instead of localStorage
+                const savedDecks = new Map();
+                try {
+                    const snapshot = await db.collection('users').doc(myUserId).collection('decks').get();
+                    snapshot.forEach(doc => {
+                        savedDecks.set(doc.id, doc.data());
+                    });
+                } catch (error) {
+                    console.error("Error fetching saved decks:", error);
+                    deckSelectionList.innerHTML = `<p class="text-red-400">Could not load decks from the server.</p>`;
+                    deckSelectionModal.classList.remove('hidden');
+                    return;
+                }
+
                 deckSelectionList.innerHTML = '';
 
-                if (Object.keys(savedDecks).length === 0) {
+                if (savedDecks.size === 0) {
                     deckSelectionList.innerHTML = `
                         <p class="text-gray-400">No saved decks found.</p>
                     `;
                 } else {
-                    for (const deckName in savedDecks) {
+                    for (const [deckName, deckData] of savedDecks.entries()) {
                         const button = document.createElement('button');
                         button.className = 'deck-select-button';
                         button.textContent = deckName;
@@ -1998,12 +2011,14 @@
                                 alert("Please enter your name.");
                                 return;
                             }
-                            const deckData = savedDecks[deckName];
-                            const cardIds = deckData.cardIds || deckData;
+                            
+                            const cardIds = deckData.cardIds || [];
                             const commanderIds = deckData.commanderIds || [];
+                            
+                            // Convert card IDs back into full card objects from our master list
                             const fullDeck = cardIds.map(id => allCardsFromDb.find(card => card.id === id)).filter(Boolean);
                             const commanders = commanderIds.map(id => allCardsFromDb.find(card => card.id === id)).filter(Boolean);
-                            // This now correctly calls the function from Step 1 with the new signature
+                            
                             loadDeckForPlayer(fullDeck, commanders, playerName, playerId);
                         });
                         deckSelectionList.appendChild(button);
