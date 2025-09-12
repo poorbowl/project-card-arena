@@ -2681,7 +2681,7 @@
                         }
                         gameRef = realdb.ref(`games/${gameId}`);
 
-                        const snapshot = await db.collection('cards').get();
+                        const snapshot = await db.collection('users').doc(myUserId).collection('cards').get();
                         allCardsFromDb = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
                         const { committed, snapshot: finalSnapshot } = await gameRef.transaction(currentGameState => {
