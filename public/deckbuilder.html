@@ -2021,20 +2021,13 @@
                 return;
             }
 
-            // Save the cards and get the names of the ones that were actually imported
-            const { imported } = await handleConfirmImport();
-
-            if (imported.length > 0) {
-                // Re-select only the cards that were successfully added to the collection
-                importSelectedCards.clear();
-                imported.forEach(name => importSelectedCards.add(name));
-
-                // Now, open the modal to choose a deck
-                openAddToDeckModal('import');
-            } else {
-                // If no new cards were added, just close the review modal
-                closeImportReviewModal();
-            }
+            // First, run the import process to ensure any NEW cards are added to the main collection.
+            await handleConfirmImport();
+            
+            // Now, regardless of what was new, open the "Add to Deck" modal
+            // with ALL the cards the user originally selected.
+            // The `importSelectedCards` set still holds the full list of names the user clicked.
+            openAddToDeckModal('import');
         };
 
         async function fetchCardsFromScryfall(names) {
