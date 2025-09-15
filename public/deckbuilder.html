@@ -1971,7 +1971,7 @@
             const existingCardNames = new Set(allCards.map(c => c.name.toLowerCase()));
 
             for (const cardData of selectedData) {
-                if (!isBasicLand(cardData.name, cardData.type) && existingCardNames.has(cardData.name.toLowerCase())) {
+                if (existingCardNames.has(cardData.name.toLowerCase())) {
                     skippedCardNames.push(cardData.name);
                     continue;
                 }
@@ -2186,10 +2186,10 @@
 
             for (const cardData of fetchedCardsData) {
                 const lowerCaseCardName = cardData.name.toLowerCase();
-                 if (!isBasicLand(cardData.name, cardData.type) && existingCardNames.has(lowerCaseCardName)) {
-                    skippedCount++;
-                    continue; 
-                }
+                 if (existingCardNames.has(lowerCaseCardName)) {
+                     skippedCount++;
+                     continue; 
+                 }
                 cardsToCreate.push(cardData);
                 existingCardNames.add(lowerCaseCardName); // Add to set to prevent duplicates within the same import
             }
