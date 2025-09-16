@@ -236,6 +236,19 @@
 
     <div class="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div class="lg:col-span-2">
+
+            <!-- START: New Card Collection Stats Panel -->
+            <div class="bg-gray-900 p-4 rounded-lg mb-4">
+                <h3 class="text-xl font-semibold text-indigo-400 mb-3">Card Collection Stats</h3>
+                <div id="collection-stats-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                    <!-- Stats will be dynamically inserted here -->
+                    <div class="bg-gray-800 p-3 rounded-lg">
+                        <div class="text-2xl font-bold text-white">0</div>
+                        <div class="text-sm text-gray-400">Total Cards</div>
+                    </div>
+                </div>
+            </div>
+            <!-- END: New Card Collection Stats Panel -->
             
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-2xl font-semibold">My Card Collection</h2>
@@ -905,21 +918,19 @@
                 card.mv = getManaValue(card.cost);
             });
 
-            // --- Filtering Logic ---
+            // --- STEP 1: Apply all non-deck filters first ---
             const nameQuery = filterNameInput.value.toLowerCase();
             if (nameQuery) filteredCards = filteredCards.filter(card => card.name.toLowerCase().includes(nameQuery));
 
             const typeQuery = filterTypeSelect.value;
             if (typeQuery) {
+                // This logic now uses .includes() to correctly filter for supertypes.
                 if (typeQuery === 'Basic Land') {
-                    // Use our existing helper function to find only basic lands
                     filteredCards = filteredCards.filter(card => isBasicLand(card.name, card.type));
                 } else if (typeQuery === 'Land') {
-                    // When "Land" is selected, show all lands that are NOT basic
-                    filteredCards = filteredCards.filter(card => card.type === 'Land' && !isBasicLand(card.name, card.type));
+                    filteredCards = filteredCards.filter(card => card.type.includes('Land') && !isBasicLand(card.name, card.type));
                 } else {
-                    // For all other types, use the original logic
-                    filteredCards = filteredCards.filter(card => card.type === typeQuery);
+                    filteredCards = filteredCards.filter(card => card.type.includes(typeQuery));
                 }
             }
 
@@ -928,17 +939,7 @@
 
             const sourceQuery = filterSourceSelect.value;
             if (sourceQuery) filteredCards = filteredCards.filter(card => card.source === sourceQuery);
-
-            const deckQuery = filterDeckSelect.value;
-            if (deckQuery) {
-                const deckData = savedDecksData.get(deckQuery);
-                if (deckData && deckData.cardIds) {
-                    const cardIdsInDeck = new Set(deckData.cardIds);
-                    filteredCards = filteredCards.filter(card => cardIdsInDeck.has(card.id));
-                }
-            }
-
-            // --- NEW Mana Value Filter Logic ---
+            
             const mvValue = parseInt(manaValueFilter.value, 10);
             if (!isNaN(mvValue)) {
                 const operator = manaValueOperator.value;
@@ -952,7 +953,29 @@
                 });
             }
 
-            // --- Sorting Logic ---
+            // --- STEP 2: Handle the Deck Filter and Stats Calculation ---
+            const deckQuery = filterDeckSelect.value;
+            let cardsForStats = filteredCards; // By default, analyze the filtered collection.
+
+            if (deckQuery) {
+                const deckData = savedDecksData.get(deckQuery);
+                if (deckData) {
+                    // Get a complete list of all card IDs in the deck (main + commanders).
+                    const allCardIdsInDeck = [...(deckData.cardIds || []), ...(deckData.commanderIds || [])];
+                    
+                    // Create a full list WITH duplicates, specifically for accurate stat calculation.
+                    cardsForStats = allCardIdsInDeck.map(id => allCards.find(c => c.id === id)).filter(Boolean);
+                    
+                    // For the visual display, filter the already-filtered collection to show only unique cards in the deck.
+                    const uniqueCardIdsInDeck = new Set(allCardIdsInDeck);
+                    filteredCards = filteredCards.filter(card => uniqueCardIdsInDeck.has(card.id));
+                }
+            }
+            
+            // Call the stats function ONCE, with the correct list of cards.
+            renderCollectionStats(cardsForStats);
+
+            // --- STEP 3: Sorting Logic ---
             const sortQuery = filterSortSelect.value;
             if (sortQuery === 'name_asc') {
                 filteredCards.sort((a, b) => a.name.localeCompare(b.name));
@@ -964,7 +987,7 @@
                 filteredCards.sort((a, b) => b.mv - a.mv || a.name.localeCompare(b.name));
             }
 
-            // --- Pagination and Rendering ---
+            // --- STEP 4: Pagination and Rendering ---
             cardsPerPage = parseInt(cardsPerPageSelect.value, 10);
             const totalPages = Math.ceil(filteredCards.length / cardsPerPage);
             if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
@@ -1041,6 +1064,41 @@
 
             renderCommanders();
         };
+
+        function renderCollectionStats(cardsToAnalyze) {
+            const statsGrid = document.getElementById('collection-stats-grid');
+            if (!statsGrid) return;
+
+            const totalCards = cardsToAnalyze.length;
+            const typeCounts = {
+                Creature: 0, 'Basic Land': 0, 'Non-Basic Land': 0,
+                Artifact: 0, Enchantment: 0, Instant: 0,
+                Sorcery: 0, Planeswalker: 0
+            };
+
+            // This new logic correctly categorizes cards with supertypes (like Legendary).
+            cardsToAnalyze.forEach(card => {
+                const cardType = card.type || '';
+                if (cardType.includes('Creature')) typeCounts.Creature++;
+                else if (isBasicLand(card.name, cardType)) typeCounts['Basic Land']++;
+                else if (cardType.includes('Land')) typeCounts['Non-Basic Land']++;
+                else if (cardType.includes('Artifact')) typeCounts.Artifact++;
+                else if (cardType.includes('Enchantment')) typeCounts.Enchantment++;
+                else if (cardType === 'Instant') typeCounts.Instant++;
+                else if (cardType === 'Sorcery') typeCounts.Sorcery++;
+                else if (cardType === 'Planeswalker') typeCounts.Planeswalker++;
+            });
+
+            let statsHTML = `<div class="bg-gray-800 p-3 rounded-lg"><div class="text-2xl font-bold text-white">${totalCards}</div><div class="text-sm text-gray-400">Total Cards</div></div>`;
+            const displayOrder = ['Creature', 'Instant', 'Sorcery', 'Enchantment', 'Artifact', 'Planeswalker', 'Basic Land', 'Non-Basic Land'];
+
+            displayOrder.forEach(type => {
+                const count = typeCounts[type];
+                const label = (type.includes('Land')) ? type + 's' : type + 's';
+                statsHTML += `<div class="bg-gray-800 p-3 rounded-lg"><div class="text-2xl font-bold text-white">${count}</div><div class="text-sm text-gray-400">${label}</div></div>`;
+            });
+            statsGrid.innerHTML = statsHTML;
+        }
 
         const renderCommanders = () => {
             commanderListEl.innerHTML = '';
@@ -1524,16 +1582,23 @@
                 return;
             }
 
+            // --- START: CORRECTED LOGIC ---
+            // Filter out commanders from the main deck before getting IDs.
+            const mainDeckCardIds = currentDeck
+                .filter(card => !commanders.some(c => c.id === card.id))
+                .map(c => c.id);
+            
+            const commanderCardIds = commanders.map(c => c.id);
+            // --- END: CORRECTED LOGIC ---
+
             const deckData = {
                 name: name,
-                cardIds: currentDeck.map(c => c.id),
-                commanderIds: commanders.map(c => c.id),
-                createdAt: firebase.firestore.FieldValue.serverTimestamp() // Good practice to timestamp saves
+                cardIds: mainDeckCardIds, // Use the new filtered list
+                commanderIds: commanderCardIds,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
             };
 
             try {
-                // This is the core change: we are now saving to a 'decks' sub-collection
-                // that lives inside a document specific to the current user.
                 const deckRef = db.collection('users').doc(myUserId).collection('decks').doc(name);
                 await deckRef.set(deckData);
 
