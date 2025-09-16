@@ -1064,6 +1064,7 @@
         
         const renderSavedDecks = async () => {
             savedDecksEl.innerHTML = '';
+            savedDecksData.clear();
             if (!myUserId) return; // Don't try to render if the user isn't logged in
 
             try {
@@ -1473,6 +1474,7 @@
         const addCardToDeck = (card) => {
             currentDeck.push(card);
             renderDeckList();
+            renderFilteredCollection();
         };
         
         const removeCardFromDeck = (cardId) => {
