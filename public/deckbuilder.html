@@ -2225,11 +2225,27 @@
 
         // --- INITIALIZATION ---
         async function init() {
-            firebase.auth().onAuthStateChanged(async (user) => {
-                if (user) {
-                    myUserId = user.uid;
-                    console.log("DEBUG: User signed in with UID:", myUserId);
-                    try {
+        firebase.auth().onAuthStateChanged(async (user) => {
+            if (user) {
+                myUserId = user.uid;
+                console.log("DEBUG: User signed in with UID:", myUserId);
+
+                // --- START: New Player Name Logic ---
+                // This ensures the player's name is always fresh on load.
+                const playerNameInput = document.getElementById('playerName');
+                if (playerNameInput) {
+                    // Prioritize the display name from the Google account.
+                    let bestName = user.displayName || localStorage.getItem('playerName');
+                    // Fallback to a generic name if nothing is found.
+                    if (!bestName || bestName === '!') bestName = 'Player';
+
+                    playerNameInput.value = bestName;
+                    // Save the correct name back to localStorage for convenience.
+                    localStorage.setItem('playerName', bestName);
+                }
+                // --- END: New Player Name Logic ---
+
+                try {
                         // --- ASSIGN ALL DOM ELEMENTS ---
                         cardCollectionEl = document.getElementById('cardCollection');
                         deckListEl = document.getElementById('deckList');
