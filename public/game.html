@@ -511,6 +511,15 @@
             transform: rotate(180deg);
         }
 
+        /* This hides the new summary view collapse/expand buttons by default */
+        #summary-actions-wrapper {
+            display: none;
+        }
+        /* This shows the summary view collapse/expand buttons ONLY when in summary view */
+        body[data-view-mode="summary"] #summary-actions-wrapper {
+            display: flex;
+        }
+
 </style>
 </head>
 <body data-chat-state="closed" class="text-white">
@@ -525,6 +534,14 @@
                 <button id="player-view-btn" class="px-3 py-1 font-semibold text-white bg-indigo-600 rounded">Player View</button>
                 <button id="summary-view-btn" class="px-3 py-1 font-semibold text-gray-400 rounded">Summary View</button>
             </div>
+
+            <!-- START: New Expand/Collapse Buttons -->
+            <div id="summary-actions-wrapper" class="flex items-center gap-2">
+                <button id="summary-expand-all" class="bg-gray-700 hover:bg-gray-600 text-white font-semibold py-1 px-3 rounded-md text-xs">Expand All</button>
+                <button id="summary-collapse-all" class="bg-gray-700 hover:bg-gray-600 text-white font-semibold py-1 px-3 rounded-md text-xs">Collapse All</button>
+            </div>
+            <!-- END: New Expand/Collapse Buttons -->
+
             <div id="opponent-selector-wrapper" class="flex items-center gap-2">
                 <label for="opponent-select" class="font-medium text-gray-400">Focus:</label>
                 <select id="opponent-select" class="bg-gray-700 border border-gray-600 rounded-md py-1 px-2 text-white">
@@ -1158,8 +1175,6 @@
                     }
                 });
 
-                // --- START: New Interactive Logic ---
-                // This makes the zone headers clickable.
                 document.querySelectorAll('.summary-zone-header').forEach(header => {
                     header.addEventListener('click', () => {
                         const targetZoneId = header.dataset.targetZone;
@@ -1172,7 +1187,25 @@
                         }
                     });
                 });
-                // --- END: New Interactive Logic ---
+
+                // --- START: New Logic for Expand/Collapse All ---
+                const expandAllBtn = document.getElementById('summary-expand-all');
+                const collapseAllBtn = document.getElementById('summary-collapse-all');
+
+                if (expandAllBtn) {
+                    expandAllBtn.addEventListener('click', () => {
+                        document.querySelectorAll('.summary-card-list').forEach(list => list.classList.remove('hidden'));
+                        document.querySelectorAll('.zone-toggle-icon').forEach(icon => icon.classList.add('expanded'));
+                    });
+                }
+
+                if (collapseAllBtn) {
+                    collapseAllBtn.addEventListener('click', () => {
+                        document.querySelectorAll('.summary-card-list').forEach(list => list.classList.add('hidden'));
+                        document.querySelectorAll('.zone-toggle-icon').forEach(icon => icon.classList.remove('expanded'));
+                    });
+                }
+                // --- END: New Logic for Expand/Collapse All ---
             }
 
             function setupBoardHTML(orderedPlayerIds) {
