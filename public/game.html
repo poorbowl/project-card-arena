@@ -2339,9 +2339,9 @@
                         const restOfDeck = playerState.deck.slice(0, originalDeckSize - interactiveActionState.count);
                         
                         const newDeck = [
-                            ...interactiveActionState.toBottom,
+                            ...interactiveActionState.toBottom.reverse(),
                             ...restOfDeck, 
-                            ...interactiveActionState.toTop.reverse()
+                            ...interactiveActionState.toTop
                         ];
                         playerState.deck = newDeck;
 
