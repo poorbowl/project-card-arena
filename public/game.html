@@ -1001,6 +1001,11 @@
                 if (currentPlayerId) document.getElementById(`player-area-${currentPlayerId}`)?.classList.add('active-player-turn');
                 const turnIndicatorEl = document.getElementById('turn-indicator');
                 if (turnIndicatorEl) turnIndicatorEl.textContent = `${gameState.players[currentPlayerId]?.name}'s Turn`;
+                // This explicitly enables or disables the button based on the current turn.
+                const passTurnBtn = document.getElementById('passTurnBtn');
+                if (passTurnBtn) {
+                    passTurnBtn.disabled = currentPlayerId !== myPlayerId;
+                }
 
 
                 orderedPlayerIds.forEach(playerId => {
@@ -2368,8 +2373,15 @@
             function handlePassTurn() {
                 gameRef.transaction(currentGameState => {
                     if (currentGameState && currentGameState.players && currentGameState.turnOrder) {
-                        const oldTurnOrder = currentGameState.turnOrder;
-                        const currentPlayerId = oldTurnOrder[currentGameState.currentPlayerIndex];
+                        const currentPlayerId = currentGameState.turnOrder[currentGameState.currentPlayerIndex];
+                        
+                        // --- START: New Security Check ---
+                        // This is the critical check. If the click is not from the current player, do nothing.
+                        if (currentPlayerId !== myPlayerId) {
+                            console.warn("Attempted to pass turn when it is not your turn.");
+                            return; // Abort the transaction
+                        }
+                        // --- END: New Security Check ---
 
                         const newPlayerIds = Object.keys(currentGameState.players).sort();
                         currentGameState.turnOrder = newPlayerIds;
