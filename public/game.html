@@ -494,6 +494,23 @@
             background-color: rgba(79, 70, 229, 0.5); /* indigo-600 */
         }
 
+        .summary-zone-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 0.25rem;
+            cursor: pointer;
+            margin-top: 0.75rem;
+        }
+        .zone-toggle-icon {
+            transition: transform 0.2s ease-in-out;
+        }
+        .zone-toggle-icon.expanded {
+            transform: rotate(180deg);
+        }
+
 </style>
 </head>
 <body data-chat-state="closed" class="text-white">
@@ -1078,52 +1095,61 @@
                     const player = gameState.players[playerId];
                     if (!player) return;
 
-                    // Create a column for each player
                     summaryHTML += `
                         <div class="summary-player-column">
-                            <div class="summary-player-header" style="outline-color: ${player.color || '#4b5563'}">
+                            <div class="summary-player-header" style="border-color: ${player.color || '#4b5563'}">
                                 <h3 class="font-bold text-lg">${player.name || `Player ${playerId.slice(1)}`}</h3>
-                                <span class="text-sm text-gray-400">Battlefield</span>
                             </div>
-                            <ul class="summary-card-list">
                     `;
 
-                    const battlefieldCards = Object.values(player.battlefield || {}).flat();
+                    const zones = [
+                        { name: 'Battlefield', data: Object.values(player.battlefield || {}).flat() },
+                        { name: 'Graveyard', data: player.graveyard || [] },
+                        { name: 'Exile', data: player.exile || [] },
+                        { name: 'Commander', data: player.commander || [] }
+                    ];
 
-                    if (battlefieldCards.length === 0) {
-                        summaryHTML += '<li class="summary-card-item text-gray-500 italic">No cards on battlefield.</li>';
-                    } else {
-                        battlefieldCards.forEach(card => {
-                            if (!card) return;
+                    zones.forEach(zone => {
+                        summaryHTML += `
+                            <div class="summary-zone-header" data-target-zone="${playerId}-${zone.name}">
+                                <span class="font-semibold">${zone.name} (${zone.data.length})</span>
+                                <svg class="zone-toggle-icon w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                            <ul id="${playerId}-${zone.name}" class="summary-card-list hidden mt-2">
+                        `;
 
-                            // --- START: New Token-Aware Logic ---
-                            let cardType = card.type || (card.isToken ? 'Token' : 'Card');
-                            let ptDisplay = '';
-
-                            if (card.isToken && card.pt) {
-                                ptDisplay = `<span class="font-bold text-sm bg-gray-700 px-2 py-0.5 rounded">${card.pt}</span>`;
-                            } else if (card.power) {
-                                ptDisplay = `<span class="font-bold text-sm bg-gray-700 px-2 py-0.5 rounded">${card.power}/${card.toughness}</span>`;
-                            }
-                            // --- END: New Token-Aware Logic ---
-
-                            summaryHTML += `
-                                <li class="summary-card-item" data-instance-id="${card.instanceId}">
-                                    <span class="font-semibold">${card.name}</span>
-                                    <span class="text-xs text-gray-400">${cardType}</span>
-                                    ${ptDisplay}
-                                </li>
-                            `;
-                        });
-                    }
+                        if (zone.data.length === 0) {
+                            summaryHTML += '<li class="summary-card-item text-gray-500 italic">Zone is empty.</li>';
+                        } else {
+                            zone.data.forEach(card => {
+                                if (!card) return;
+                                let cardType = card.type || (card.isToken ? 'Token' : 'Card');
+                                let ptDisplay = '';
+                                if (card.isToken && card.pt) {
+                                    ptDisplay = `<span class="font-bold text-sm bg-gray-700 px-2 py-0.5 rounded">${card.pt}</span>`;
+                                } else if (card.power) {
+                                    ptDisplay = `<span class="font-bold text-sm bg-gray-700 px-2 py-0.5 rounded">${card.power}/${card.toughness}</span>`;
+                                }
+                                summaryHTML += `
+                                    <li class="summary-card-item" data-instance-id="${card.instanceId}">
+                                        <span class="font-semibold">${card.name}</span>
+                                        <span class="text-xs text-gray-400">${cardType}</span>
+                                        ${ptDisplay}
+                                    </li>
+                                `;
+                            });
+                        }
+                        summaryHTML += '</ul>';
+                    });
                     
-                    summaryHTML += '</ul></div>';
+                    summaryHTML += '</div>';
                 });
 
                 summaryHTML += '</div>';
-                mainGridEl.innerHTML = summaryHTML; // Replace the main grid with the summary view
+                mainGridEl.innerHTML = summaryHTML;
 
-                // Re-attach mouseover listeners so the popout still works
                 document.querySelectorAll('.summary-card-item').forEach(item => {
                     if (item.dataset.instanceId) {
                         item.addEventListener('mouseenter', handleCardMouseOver);
@@ -1131,6 +1157,22 @@
                         item.addEventListener('mousemove', handleCardMouseMove);
                     }
                 });
+
+                // --- START: New Interactive Logic ---
+                // This makes the zone headers clickable.
+                document.querySelectorAll('.summary-zone-header').forEach(header => {
+                    header.addEventListener('click', () => {
+                        const targetZoneId = header.dataset.targetZone;
+                        const zoneList = document.getElementById(targetZoneId);
+                        const icon = header.querySelector('.zone-toggle-icon');
+
+                        if (zoneList && icon) {
+                            zoneList.classList.toggle('hidden');
+                            icon.classList.toggle('expanded');
+                        }
+                    });
+                });
+                // --- END: New Interactive Logic ---
             }
 
             function setupBoardHTML(orderedPlayerIds) {
