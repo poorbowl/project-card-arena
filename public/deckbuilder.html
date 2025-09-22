@@ -74,6 +74,18 @@
         .pip-G { background-color: #9bd3ae; }
         .pip-M { background: linear-gradient(135deg, #f9aa8f 25%, #aae0fa 25%, #aae0fa 50%, #9bd3ae 50%, #9bd3ae 75%, #cbc2bf 75%); }
         .pip-C { background-color: #cec8c3; }
+
+        /* NEW: Multi colour filter colour pips */
+        .color-pip-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+
+        #color-filter-btn {
+            min-width: 160px; /* This prevents the button from shrinking */
+        }
     </style>
 </head>
 <body class="bg-gray-800 text-white p-4 md:p-8">
@@ -280,16 +292,28 @@
                     <option>Planeswalker</option>
                     <option>Sorcery</option>
                 </select>
-                <select id="filterColor" class="bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                    <option value="">All Colors</option>
-                    <option value="W">White</option>
-                    <option value="U">Blue</option>
-                    <option value="B">Black</option>
-                    <option value="R">Red</option>
-                    <option value="G">Green</option>
-                    <option value="C">Colorless</option>
-                    <option value="M">Multi-Color</option>
-                </select>
+                <div id="color-filter-container" class="relative">
+                    <button id="color-filter-btn" class="w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 flex justify-between items-center">
+                        <div class="flex items-center gap-2">
+                            <span id="color-filter-text">All Colors</span>
+                            <div id="color-filter-pips" class="flex gap-1"></div>
+                        </div>
+                        <svg class="w-5 h-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                    <div id="color-filter-options" class="hidden absolute top-full mt-1 w-full bg-gray-900 border border-gray-600 rounded-md shadow-lg z-10 p-2">
+                        <!-- This is the line that has been changed to a vertical layout -->
+                        <div class="flex flex-col gap-1"> 
+                            <label class="flex items-center cursor-pointer p-2 rounded hover:bg-gray-700"><input type="checkbox" value="B" class="color-checkbox h-4 w-4 rounded bg-gray-600 border-gray-500 text-indigo-600 focus:ring-indigo-500"> <span class="ml-2 text-white">Black</span></label>
+                            <label class="flex items-center cursor-pointer p-2 rounded hover:bg-gray-700"><input type="checkbox" value="U" class="color-checkbox h-4 w-4 rounded bg-gray-600 border-gray-500 text-indigo-600 focus:ring-indigo-500"> <span class="ml-2 text-white">Blue</span></label>
+                            <label class="flex items-center cursor-pointer p-2 rounded hover:bg-gray-700"><input type="checkbox" value="G" class="color-checkbox h-4 w-4 rounded bg-gray-600 border-gray-500 text-indigo-600 focus:ring-indigo-500"> <span class="ml-2 text-white">Green</span></label>
+                            <label class="flex items-center cursor-pointer p-2 rounded hover:bg-gray-700"><input type="checkbox" value="R" class="color-checkbox h-4 w-4 rounded bg-gray-600 border-gray-500 text-indigo-600 focus:ring-indigo-500"> <span class="ml-2 text-white">Red</span></label>
+                            <label class="flex items-center cursor-pointer p-2 rounded hover:bg-gray-700"><input type="checkbox" value="W" class="color-checkbox h-4 w-4 rounded bg-gray-600 border-gray-500 text-indigo-600 focus:ring-indigo-500"> <span class="ml-2 text-white">White</span></label>
+                            <label class="flex items-center cursor-pointer p-2 rounded hover:bg-gray-700"><input type="checkbox" value="C" class="color-checkbox h-4 w-4 rounded bg-gray-600 border-gray-500 text-indigo-600 focus:ring-indigo-500"> <span class="ml-2 text-white">Colorless</span></label>
+                        </div>
+                    </div>
+                </div>
                 <div class="flex items-center bg-gray-700 border border-gray-600 rounded-md shadow-sm">
                     <select id="manaValueOperator" class="bg-gray-700 rounded-l-md py-2 pl-3 pr-1 border-r border-gray-600 text-white focus:outline-none">
                         <option value="=">=</option>
@@ -457,21 +481,6 @@
         <div id="popout-flavour" class="text-xs text-gray-400 italic"></div>
     </div>
 
-    <!-- NEW: Pop-out element for detailed card previews -->
-    <div id="card-popout" class="rounded-lg shadow-2xl p-2 space-y-2">
-        <div class="flex justify-between items-start">
-            <span id="popout-name" class="font-bold"></span>
-            <span id="popout-cost" class="text-sm flex gap-1 items-center"></span>
-        </div>
-        <img id="popout-img" src="" alt="Card Image" class="rounded-md">
-        <div class="flex justify-between items-center text-sm">
-            <span id="popout-type" class="font-semibold"></span>
-            <span id="popout-pt" class="font-bold"></span>
-        </div>
-        <div id="popout-text" class="text-xs bg-gray-800 p-2 rounded-md whitespace-pre-wrap max-h-40 overflow-y-auto"></div>
-        <div id="popout-flavour" class="text-xs text-gray-400 italic"></div>
-    </div>
-
     <div id="import-review-modal" class="hidden fixed inset-0 bg-black/80 z-50 flex flex-col p-4">
         <div class="bg-gray-800 rounded-lg max-w-7xl w-full max-h-full mx-auto flex flex-col p-6 shadow-2xl border border-indigo-500">
             <div class="flex justify-between items-center mb-4 flex-shrink-0">
@@ -534,7 +543,7 @@
         notFoundCount, downloadCsvBtn, addDirectlyBtn, importReviewModal, importReviewClose,
         importSelectAllBtn, importDeselectAllBtn, importSelectionCountEl, importReviewContent,
         importReviewCancel, importReviewConfirm, filterNameInput, filterTypeSelect, filterSortSelect,
-        filterColorSelect, filterSourceSelect, filterDeckSelect, prevPageBtn, nextPageBtn, pageInfoEl, toggleSelectModeBtn,
+        filterSourceSelect, filterDeckSelect, prevPageBtn, nextPageBtn, pageInfoEl, toggleSelectModeBtn,
         selectionActionBar, selectionCountEl, deleteSelectedBtn, addSelectedToDeckBtn, selectAllBtn, deselectAllBtn, cardPopoutEl,
         popoutNameEl, popoutCostEl, popoutImgEl, popoutTypeEl, popoutPtEl, popoutTextEl, popoutFlavourEl, 
         importReviewAddToDeckBtn, addToDeckModal, addToDeckCloseBtn, deckChoiceList, addToDeckConfirmBtn,
@@ -645,12 +654,16 @@
         const handleClearFilters = () => {
             filterNameInput.value = '';
             filterTypeSelect.value = '';
-            filterColorSelect.value = '';
             filterSourceSelect.value = '';
             filterDeckSelect.value = '';
             manaValueOperator.value = '=';
             manaValueFilter.value = '';
             filterSortSelect.value = 'name_asc';
+
+            // New logic to uncheck all color checkboxes
+            document.querySelectorAll('.color-checkbox:checked').forEach(checkbox => {
+                checkbox.checked = false;
+            });
 
             // Re-render the collection with the cleared filters
             renderFilteredCollection();
@@ -911,31 +924,57 @@
         };
 
         const renderFilteredCollection = () => {
+            // --- START: UNIFIED UI AND FILTERING LOGIC ---
+
+            // This block updates the color button's display. It was the missing piece.
+            const colorFilterText = document.getElementById('color-filter-text');
+            const colorFilterPips = document.getElementById('color-filter-pips');
+            if (colorFilterText && colorFilterPips) {
+                const selectedColorsForDisplay = Array.from(document.querySelectorAll('.color-checkbox:checked'));
+                if (selectedColorsForDisplay.length === 0) {
+                    colorFilterText.textContent = 'All Colors';
+                    colorFilterPips.innerHTML = '';
+                } else {
+                    colorFilterText.textContent = ''; // Hide text when pips are shown
+                    colorFilterPips.innerHTML = selectedColorsForDisplay.map(cb =>
+                        `<div class="color-pip-indicator pip-${cb.value}"></div>`
+                    ).join('');
+                }
+            }
+            
             let filteredCards = [...allCards];
 
-            // --- Add Mana Value to each card for sorting/filtering ---
+            // Add Mana Value to each card for sorting/filtering
             filteredCards.forEach(card => {
                 card.mv = getManaValue(card.cost);
             });
 
-            // --- STEP 1: Apply all non-deck filters first ---
+            // --- Apply all non-deck filters first ---
             const nameQuery = filterNameInput.value.toLowerCase();
             if (nameQuery) filteredCards = filteredCards.filter(card => card.name.toLowerCase().includes(nameQuery));
 
             const typeQuery = filterTypeSelect.value;
             if (typeQuery) {
-                // This logic now uses .includes() to correctly filter for supertypes.
                 if (typeQuery === 'Basic Land') {
                     filteredCards = filteredCards.filter(card => isBasicLand(card.name, card.type));
                 } else if (typeQuery === 'Land') {
+                    // Show all lands that are NOT basic
                     filteredCards = filteredCards.filter(card => card.type.includes('Land') && !isBasicLand(card.name, card.type));
                 } else {
+                    // Use .includes() for flexibility (e.g., "Creature" matches "Legendary Creature")
                     filteredCards = filteredCards.filter(card => card.type.includes(typeQuery));
                 }
             }
 
-            const colorQuery = filterColorSelect.value;
-            if (colorQuery) filteredCards = filteredCards.filter(card => getCardColorIdentity(card.cost).includes(colorQuery));
+            // New logic for multi-color checkbox filtering
+            const selectedColors = Array.from(document.querySelectorAll('.color-checkbox:checked')).map(cb => cb.value);
+            if (selectedColors.length > 0) {
+                filteredCards = filteredCards.filter(card => {
+                    const cardColors = getCardColorIdentity(card.cost);
+                    // This is an "AND" filter - the card must have every selected color.
+                    return selectedColors.every(color => cardColors.includes(color));
+                });
+            }
 
             const sourceQuery = filterSourceSelect.value;
             if (sourceQuery) filteredCards = filteredCards.filter(card => card.source === sourceQuery);
@@ -953,20 +992,19 @@
                 });
             }
 
-            // --- STEP 2: Handle the Deck Filter and Stats Calculation ---
+            // --- Handle the Deck Filter and Stats Calculation ---
             const deckQuery = filterDeckSelect.value;
             let cardsForStats = filteredCards; // By default, analyze the filtered collection.
 
             if (deckQuery) {
                 const deckData = savedDecksData.get(deckQuery);
                 if (deckData) {
-                    // Get a complete list of all card IDs in the deck (main + commanders).
                     const allCardIdsInDeck = [...(deckData.cardIds || []), ...(deckData.commanderIds || [])];
                     
-                    // Create a full list WITH duplicates, specifically for accurate stat calculation.
+                    // For stats, get the full list WITH duplicates for accuracy.
                     cardsForStats = allCardIdsInDeck.map(id => allCards.find(c => c.id === id)).filter(Boolean);
                     
-                    // For the visual display, filter the already-filtered collection to show only unique cards in the deck.
+                    // For visual display, filter the already-filtered collection to show only cards in the deck.
                     const uniqueCardIdsInDeck = new Set(allCardIdsInDeck);
                     filteredCards = filteredCards.filter(card => uniqueCardIdsInDeck.has(card.id));
                 }
@@ -975,7 +1013,7 @@
             // Call the stats function ONCE, with the correct list of cards.
             renderCollectionStats(cardsForStats);
 
-            // --- STEP 3: Sorting Logic ---
+            // --- Sorting Logic ---
             const sortQuery = filterSortSelect.value;
             if (sortQuery === 'name_asc') {
                 filteredCards.sort((a, b) => a.name.localeCompare(b.name));
@@ -987,10 +1025,11 @@
                 filteredCards.sort((a, b) => b.mv - a.mv || a.name.localeCompare(b.name));
             }
 
-            // --- STEP 4: Pagination and Rendering ---
+            // --- Pagination and Rendering ---
             cardsPerPage = parseInt(cardsPerPageSelect.value, 10);
             const totalPages = Math.ceil(filteredCards.length / cardsPerPage);
             if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
+            if (currentPage === 0 && totalPages > 0) currentPage = 1; // Ensure currentPage is at least 1
             const startIndex = (currentPage - 1) * cardsPerPage;
             const endIndex = startIndex + cardsPerPage;
             const paginatedCards = filteredCards.slice(startIndex, endIndex);
@@ -2290,28 +2329,21 @@
 
         // --- INITIALIZATION ---
         async function init() {
-        firebase.auth().onAuthStateChanged(async (user) => {
-            if (user) {
-                myUserId = user.uid;
-                console.log("DEBUG: User signed in with UID:", myUserId);
+            firebase.auth().onAuthStateChanged(async (user) => {
+                if (user) {
+                    myUserId = user.uid;
+                    console.log("DEBUG: User signed in with UID:", myUserId);
 
-                // --- START: New Player Name Logic ---
-                // This ensures the player's name is always fresh on load.
-                const playerNameInput = document.getElementById('playerName');
-                if (playerNameInput) {
-                    // Prioritize the display name from the Google account.
-                    let bestName = user.displayName || localStorage.getItem('playerName');
-                    // Fallback to a generic name if nothing is found.
-                    if (!bestName || bestName === '!') bestName = 'Player';
+                    const playerNameInput = document.getElementById('playerName');
+                    if (playerNameInput) {
+                        let bestName = user.displayName || localStorage.getItem('playerName');
+                        if (!bestName || bestName === '!') bestName = 'Player';
+                        playerNameInput.value = bestName;
+                        localStorage.setItem('playerName', bestName);
+                    }
 
-                    playerNameInput.value = bestName;
-                    // Save the correct name back to localStorage for convenience.
-                    localStorage.setItem('playerName', bestName);
-                }
-                // --- END: New Player Name Logic ---
-
-                try {
-                        // --- ASSIGN ALL DOM ELEMENTS ---
+                    try {
+                        // --- STEP 1: ASSIGN ALL DOM ELEMENTS ---
                         cardCollectionEl = document.getElementById('cardCollection');
                         deckListEl = document.getElementById('deckList');
                         commanderListEl = document.getElementById('commanderList');
@@ -2332,7 +2364,7 @@
                         joinGameIdInput = document.getElementById('joinGameIdInput');
                         messageAreaEl = document.getElementById('message-area');
                         importCsvBtn = document.getElementById('importCsvBtn');
-                        importAndAddBtn = document.getElementById('importAndAddBtn'); 
+                        importAndAddBtn = document.getElementById('importAndAddBtn');
                         imageUploadProgressEl = document.getElementById('image-upload-progress');
                         lobbySectionEl = document.getElementById('lobby-section');
                         lobbyControlsEl = document.getElementById('lobby-controls');
@@ -2365,7 +2397,6 @@
                         filterNameInput = document.getElementById('filterName');
                         filterTypeSelect = document.getElementById('filterType');
                         filterSortSelect = document.getElementById('filterSort');
-                        filterColorSelect = document.getElementById('filterColor');
                         filterSourceSelect = document.getElementById('filterSource');
                         filterDeckSelect = document.getElementById('filterDeck');
                         prevPageBtn = document.getElementById('prev-page-btn');
@@ -2398,7 +2429,7 @@
                         jumpToPageInput = document.getElementById('jump-to-page-input');
                         cardsPerPageSelect = document.getElementById('cards-per-page-select');
 
-                        // --- ATTACH ALL EVENT LISTENERS ---
+                        // --- STEP 2: ATTACH ALL EVENT LISTENERS ---
                         const tabBtns = document.querySelectorAll('.tab-button');
                         const tabContents = document.querySelectorAll('.tab-content');
                         tabBtns.forEach(btn => {
@@ -2408,9 +2439,7 @@
                                 const targetId = btn.id.replace('btn', 'content');
                                 tabContents.forEach(content => {
                                     content.classList.remove('active');
-                                    if (content.id === targetId) {
-                                        content.classList.add('active');
-                                    }
+                                    if (content.id === targetId) content.classList.add('active');
                                 });
                             });
                         });
@@ -2419,7 +2448,6 @@
                             creatureFields.classList.toggle('hidden', selectedType !== 'Creature');
                             planeswalkerFields.classList.toggle('hidden', selectedType !== 'Planeswalker');
                         });
-
                         gridViewBtn.addEventListener('click', () => {
                             if (currentView === 'list') {
                                 currentView = 'grid';
@@ -2430,7 +2458,6 @@
                                 renderFilteredCollection();
                             }
                         });
-
                         listViewBtn.addEventListener('click', () => {
                             if (currentView === 'grid') {
                                 currentView = 'list';
@@ -2441,7 +2468,6 @@
                                 renderFilteredCollection();
                             }
                         });
-
                         saveCardBtn.addEventListener('click', handleSaveCard);
                         cancelEditBtn.addEventListener('click', resetForm);
                         saveDeckBtn.addEventListener('click', handleSaveDeck);
@@ -2452,12 +2478,10 @@
                         copyLinkBtn.addEventListener('click', handleCopyLink);
                         document.getElementById('bulkImageUpload').addEventListener('change', handleImageUpload);
                         document.getElementById('csvFile').addEventListener('change', (event) => {
-                            if (event.target.files && event.target.files.length > 0) {
-                                csvFileToProcess = event.target.files[0];
-                            }
+                            if (event.target.files && event.target.files.length > 0) csvFileToProcess = event.target.files[0];
                         });
                         importCsvBtn.addEventListener('click', () => handleCsvImport(true));
-                        importAndAddBtn.addEventListener('click', handleCsvImportAndAddToDeck); // ADD THIS LINE
+                        importAndAddBtn.addEventListener('click', handleCsvImportAndAddToDeck);
                         fetchBtn.addEventListener('click', handleFetchClick);
                         downloadCsvBtn.addEventListener('click', () => {
                             const csv = convertToCSV(fetchedCardsData);
@@ -2467,21 +2491,12 @@
                         filterNameInput.addEventListener('input', renderFilteredCollection);
                         filterTypeSelect.addEventListener('change', renderFilteredCollection);
                         filterSortSelect.addEventListener('change', renderFilteredCollection);
-                        filterColorSelect.addEventListener('change', renderFilteredCollection);
                         filterSourceSelect.addEventListener('change', renderFilteredCollection);
                         filterDeckSelect.addEventListener('change', renderFilteredCollection);
                         manaValueOperator.addEventListener('change', renderFilteredCollection);
                         manaValueFilter.addEventListener('input', renderFilteredCollection);
-                        prevPageBtn.addEventListener('click', () => {
-                            if (currentPage > 1) {
-                                currentPage--;
-                                renderFilteredCollection();
-                            }
-                        });
-                        nextPageBtn.addEventListener('click', () => {
-                            currentPage++;
-                            renderFilteredCollection();
-                        });
+                        prevPageBtn.addEventListener('click', () => { if (currentPage > 1) { currentPage--; renderFilteredCollection(); } });
+                        nextPageBtn.addEventListener('click', () => { currentPage++; renderFilteredCollection(); });
                         jumpToPageInput.addEventListener('change', handleJumpToPage);
                         cardsPerPageSelect.addEventListener('change', handlePerPageChange);
                         toggleSelectModeBtn.addEventListener('click', toggleSelectMode);
@@ -2492,36 +2507,35 @@
                         deselectAllBtn.addEventListener('click', handleDeselectAll);
                         addToDeckCloseBtn.addEventListener('click', () => {
                             addToDeckModal.classList.add('hidden');
-                            if (addToDeckModal.dataset.source === 'import') {
-                                importReviewModal.classList.remove('hidden');
-                            }
+                            if (addToDeckModal.dataset.source === 'import') importReviewModal.classList.remove('hidden');
                         });
                         importReviewClose.addEventListener('click', closeImportReviewModal);
                         importReviewCancel.addEventListener('click', closeImportReviewModal);
-                        importReviewConfirm.addEventListener('click', handleAddToCollection); // Use the new handler
+                        importReviewConfirm.addEventListener('click', handleAddToCollection);
                         importReviewAddToDeckBtn.addEventListener('click', handleScryfallImportAndAddToDeck);
                         importSelectAllBtn.addEventListener('click', () => {
-                            importReviewContent.querySelectorAll('.card-wrapper').forEach(wrapper => {
-                                if (!importSelectedCards.has(wrapper.dataset.cardId)) {
-                                    wrapper.click();
-                                }
-                            });
+                            importReviewContent.querySelectorAll('.card-wrapper').forEach(w => { if (!importSelectedCards.has(w.dataset.cardId)) w.click(); });
                         });
                         importDeselectAllBtn.addEventListener('click', () => {
-                            importReviewContent.querySelectorAll('.card-wrapper').forEach(wrapper => {
-                                if (importSelectedCards.has(wrapper.dataset.cardId)) {
-                                    wrapper.click();
-                                }
-                            });
+                            importReviewContent.querySelectorAll('.card-wrapper').forEach(w => { if (importSelectedCards.has(w.dataset.cardId)) w.click(); });
                         });
-
                         addToDeckConfirmBtn.addEventListener('click', handleConfirmAddToDecks);
 
-                        // --- INITIAL LOAD ---
+                        const colorFilterBtn = document.getElementById('color-filter-btn');
+                        const colorFilterOptions = document.getElementById('color-filter-options');
+                        const colorFilterContainer = document.getElementById('color-filter-container');
+                        document.querySelectorAll('.color-checkbox').forEach(cb => cb.addEventListener('change', renderFilteredCollection));
+                        colorFilterBtn.addEventListener('click', (e) => { e.stopPropagation(); colorFilterOptions.classList.toggle('hidden'); });
+                        window.addEventListener('click', (e) => {
+                            if (!colorFilterContainer.contains(e.target)) colorFilterOptions.classList.add('hidden');
+                        });
+
+                        // --- STEP 3: INITIAL LOAD ---
                         await loadAllCardsFromFirebase();
                         await renderSavedDecks();
                         await populateDeckFilter();
                         cardTypeSelect.dispatchEvent(new Event('change'));
+                        renderFilteredCollection(); // Initial render to populate stats
 
                     } catch (error) {
                         console.error("Initialization failed:", error);
