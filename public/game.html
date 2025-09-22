@@ -1095,12 +1095,23 @@
                     } else {
                         battlefieldCards.forEach(card => {
                             if (!card) return;
-                            // Each card is a list item with its details
+
+                            // --- START: New Token-Aware Logic ---
+                            let cardType = card.type || (card.isToken ? 'Token' : 'Card');
+                            let ptDisplay = '';
+
+                            if (card.isToken && card.pt) {
+                                ptDisplay = `<span class="font-bold text-sm bg-gray-700 px-2 py-0.5 rounded">${card.pt}</span>`;
+                            } else if (card.power) {
+                                ptDisplay = `<span class="font-bold text-sm bg-gray-700 px-2 py-0.5 rounded">${card.power}/${card.toughness}</span>`;
+                            }
+                            // --- END: New Token-Aware Logic ---
+
                             summaryHTML += `
                                 <li class="summary-card-item" data-instance-id="${card.instanceId}">
                                     <span class="font-semibold">${card.name}</span>
-                                    <span class="text-xs text-gray-400">${card.type || 'Card'}</span>
-                                    ${card.power ? `<span class="font-bold text-sm bg-gray-700 px-2 py-0.5 rounded">${card.power}/${card.toughness}</span>` : ''}
+                                    <span class="text-xs text-gray-400">${cardType}</span>
+                                    ${ptDisplay}
                                 </li>
                             `;
                         });
