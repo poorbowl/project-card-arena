@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Project Card Arena - Main Menu</title>
+    <title>Project Card Arena - Login</title>
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -27,10 +27,9 @@
         .btn-secondary {
             @apply bg-green-600 hover:bg-green-700 text-white;
         }
-        /* FIX: Made the input field styles more explicit to override browser defaults */
         .input-field {
             color: white;
-            background-color: #374151; /* Corresponds to Tailwind's gray-700 */
+            background-color: #374151; 
             @apply block w-full border border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500;
         }
     </style>
@@ -39,20 +38,11 @@
 
     <div class="w-full max-w-md mx-auto bg-gray-900 p-8 rounded-2xl shadow-2xl border border-gray-700">
         <h1 class="text-4xl font-bold text-center mb-2 text-indigo-400">Project Card Arena</h1>
-        <p class="text-center text-gray-400 mb-8">Your Digital Tabletop Sandbox</p>
+        <p class="text-center text-gray-400 mb-8">Private Alpha Access</p>
 
         <!-- This container will be hidden after login -->
         <div id="auth-container">
-            <div class="mb-4 border-b border-gray-700">
-                <nav class="flex -mb-px" aria-label="Tabs">
-                    <button id="login-tab" class="w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm text-indigo-400 border-indigo-500">
-                        Sign In
-                    </button>
-                    <button id="signup-tab" class="w-1/2 py-4 px-1 text-center border-b-2 border-transparent font-medium text-sm text-gray-400 hover:text-gray-200 hover:border-gray-500">
-                        Create Account
-                    </button>
-                </nav>
-            </div>
+            <h2 class="text-xl font-semibold text-center mb-4 text-white">Sign In</h2>
 
             <!-- Login Form -->
             <div id="login-form" class="space-y-4">
@@ -64,22 +54,11 @@
                     <label for="login-password" class="sr-only">Password</label>
                     <input type="password" id="login-password" placeholder="Password" class="input-field">
                 </div>
-                <button id="login-btn" class="btn btn-primary">Sign In</button>
+                <button id="login-btn" class="btn btn-primary">Enter</button>
             </div>
 
-            <!-- Signup Form (hidden by default) -->
-            <div id="signup-form" class="space-y-4 hidden">
-                <div>
-                    <label for="signup-email" class="sr-only">Email</label>
-                    <input type="email" id="signup-email" placeholder="Email Address" class="input-field">
-                </div>
-                <div>
-                    <label for="signup-password" class="sr-only">Password</label>
-                    <input type="password" id="signup-password" placeholder="Password (6+ characters)" class="input-field">
-                </div>
-                <button id="signup-btn" class="btn btn-primary">Create Account</button>
-            </div>
             <p id="auth-error-message" class="text-red-400 text-sm text-center mt-4 hidden"></p>
+            <p class="text-gray-500 text-xs text-center mt-6">Access to this platform is currently by invitation only.</p>
         </div>
 
         <!-- This container is hidden until the user logs in -->
@@ -115,65 +94,34 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // --- Get all the new elements ---
             const authContainer = document.getElementById('auth-container');
             const mainMenuContainer = document.getElementById('main-menu-container');
             const userEmailEl = document.getElementById('user-email');
             
-            const loginTab = document.getElementById('login-tab');
-            const signupTab = document.getElementById('signup-tab');
-            const loginForm = document.getElementById('login-form');
-            const signupForm = document.getElementById('signup-form');
-
             const loginBtn = document.getElementById('login-btn');
-            const signupBtn = document.getElementById('signup-btn');
             const logoutBtn = document.getElementById('logout-btn');
             
             const loginEmailInput = document.getElementById('login-email');
             const loginPasswordInput = document.getElementById('login-password');
-            const signupEmailInput = document.getElementById('signup-email');
-            const signupPasswordInput = document.getElementById('signup-password');
-            
             const authErrorMessageEl = document.getElementById('auth-error-message');
             
-            // --- Original menu elements ---
             const joinGameBtn = document.getElementById('joinGameBtn');
             const gameIdInput = document.getElementById('gameIdInput');
             const errorMessageEl = document.getElementById('error-message');
 
-            // --- Function to switch between login and signup tabs ---
-            const showLoginTab = () => {
-                loginTab.classList.add('text-indigo-400', 'border-indigo-500');
-                loginTab.classList.remove('text-gray-400', 'border-transparent', 'hover:text-gray-200', 'hover:border-gray-500');
-                signupTab.classList.add('text-gray-400', 'border-transparent', 'hover:text-gray-200', 'hover:border-gray-500');
-                signupTab.classList.remove('text-indigo-400', 'border-indigo-500');
-                loginForm.classList.remove('hidden');
-                signupForm.classList.add('hidden');
-                authErrorMessageEl.classList.add('hidden');
-            };
-
-            const showSignupTab = () => {
-                signupTab.classList.add('text-indigo-400', 'border-indigo-500');
-                signupTab.classList.remove('text-gray-400', 'border-transparent', 'hover:text-gray-200', 'hover:border-gray-500');
-                loginTab.classList.add('text-gray-400', 'border-transparent', 'hover:text-gray-200', 'hover:border-gray-500');
-                loginTab.classList.remove('text-indigo-400', 'border-indigo-500');
-                signupForm.classList.remove('hidden');
-                loginForm.classList.add('hidden');
-                authErrorMessageEl.classList.add('hidden');
-            };
-            
             // --- Function to update the UI based on login state ---
             const updateUI = (user) => {
                 if (user) {
-                    // User is signed in
                     authContainer.classList.add('hidden');
                     mainMenuContainer.classList.remove('hidden');
                     userEmailEl.textContent = user.email;
                 } else {
-                    // User is signed out
                     mainMenuContainer.classList.add('hidden');
                     authContainer.classList.remove('hidden');
-                    showLoginTab(); // Default to login tab
+                    // Clear fields
+                    loginEmailInput.value = '';
+                    loginPasswordInput.value = '';
+                    authErrorMessageEl.classList.add('hidden');
                 }
             };
 
@@ -185,19 +133,22 @@
             loginBtn.addEventListener('click', () => {
                 const email = loginEmailInput.value;
                 const password = loginPasswordInput.value;
+                
+                authErrorMessageEl.classList.add('hidden');
+                
+                if(!email || !password) {
+                     authErrorMessageEl.textContent = "Please enter both email and password.";
+                     authErrorMessageEl.classList.remove('hidden');
+                     return;
+                }
+
                 firebase.auth().signInWithEmailAndPassword(email, password)
                     .catch(error => {
-                        authErrorMessageEl.textContent = error.message;
-                        authErrorMessageEl.classList.remove('hidden');
-                    });
-            });
-
-            signupBtn.addEventListener('click', () => {
-                const email = signupEmailInput.value;
-                const password = signupPasswordInput.value;
-                firebase.auth().createUserWithEmailAndPassword(email, password)
-                    .catch(error => {
-                        authErrorMessageEl.textContent = error.message;
+                        let msg = "Incorrect email or password.";
+                        if(error.code === 'auth/user-not-found') msg = "No account found with this email.";
+                        if(error.code === 'auth/wrong-password') msg = "Incorrect password.";
+                        
+                        authErrorMessageEl.textContent = msg;
                         authErrorMessageEl.classList.remove('hidden');
                     });
             });
@@ -206,11 +157,7 @@
                 firebase.auth().signOut();
             });
 
-            // --- Tab Switching Logic ---
-            loginTab.addEventListener('click', showLoginTab);
-            signupTab.addEventListener('click', showSignupTab);
-
-            // --- Original Join Game Logic ---
+            // --- Join Game Logic ---
             const handleJoinGame = () => {
                 const gameId = gameIdInput.value.trim();
                 if (!gameId) {
@@ -240,6 +187,13 @@
             gameIdInput.addEventListener('keydown', (event) => {
                 if (event.key === 'Enter') {
                     handleJoinGame();
+                }
+            });
+            
+            // Allow Enter key to submit login form
+            loginPasswordInput.addEventListener('keydown', (event) => {
+                 if (event.key === 'Enter') {
+                    loginBtn.click();
                 }
             });
         });
